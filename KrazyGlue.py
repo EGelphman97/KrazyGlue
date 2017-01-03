@@ -9,8 +9,7 @@ EPSILON = 0.00001
 STEP_SIZE = 0.1
 r = 2.0
 h = 0.0000001
-fpp_const = 0
-t, H, X, Y, dX_dr, dX_dt, dY_dr, dY_dt = 0.0
+t, fp, fpp, H, X, Y, dX_dr, dX_dt, dY_dr, dY_dt = 0.0
 r_vals = []
 t_vals = []
 H_vals = []
@@ -24,8 +23,6 @@ while r <= -10000 :
     t = f.subs({x:r})
     fp = (f.subs({x:r+h}) + f.subs({x:r-h})) / (2 * h)
     fpp = (f.subs({x:r+h}) - (2 * f.subs({x:r})) + f.subs({x:r-h})) / (h**2)
-    if abs(fpp) < EPSILON:
-        fpp_const = 1
     a = (4.5) ** (2/3)
     b = r - t 
     c = 1 - t
@@ -69,14 +66,16 @@ while r <= -10000 :
     if r < -1:
         STEP_SIZE += 0.5
     r -= STEP_SIZE
-if fpp_const == 0 :
-    print("Boundary Condition 1(and Therefore 3) Not Met Because Second Derivative of f not Constant at Any Point")   
+if abs(fpp) >= EPSILON:
+    print("Boundary Condition 1(and Therefore 3) not met as f double prime does not equal 0")
     quit()
+#Graph H(r) vs. r    
 plot(r_vals, H_vals)
 title("Mean Curvature H(r) at Distance r")
 xlabel("r")
 ylabel("H(r)")
 show()
+#Graoh t = f(r) vs. r
 plot(r_vals, t_vals)
 title("t as a Function of r")
 xlabel("r")
