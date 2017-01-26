@@ -2,33 +2,22 @@
 #January 16, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 
-from sympy import Limit, S
-from pylab import plot, show, title, xlabel, ylabel
-import Function
+import Function_SVar
 
 EPSILON = 0.00001
 STEP_SIZE = 0.1
 r = 2.0
-t, fp, fpp, H, X, Y, dX_dr, dX_dt, dY_dr, dY_dt = 0.0
-r_vals = []
-t_vals = []
-fp_vals = []
-fpp_vals = []
 H_vals = []
 expression = input('Enter a function f(r): ')
-f = Function(expression)
-lim = Limit(expression, r, S.Infinity)
-if lim != S.NegativeInfinity :
+f = Function_SVar(expression)
+if f.checkBoundaryCondition() == False :
     print("Boundary Condition 2(and Therefore 3) not met as f does not approach negative infinity")
     quit()
 while r <= -10000 :
-    r_vals.append(r)
-    t = f.evaluate(r)
-    t_vals.append(t)
-    fp = f.differentiate(r, 1)
-    fp_vals.append(fp)
-    fpp = f.differentiate(r, 2)
-    fpp_vals.append(fpp)
+    t = f.evaluate(r)   #f(r)
+    fp = f.differentiate(r, 1) #f'(r)
+    fpp = f.differentiate(r, 2)#f''(r)
+    table = f.generateTable()
     a = (4.5) ** (2/3)
     b = r - t 
     c = 1 - t
@@ -73,13 +62,7 @@ while r <= -10000 :
 if abs(fpp) >= EPSILON:
     print("Boundary Condition 1(and Therefore 3) not met as f double prime does not equal 0")
     quit()
-#Graph t = f(r) vs. r
-plot(r_vals, t_vals)
-title("t as a Function of r")
-xlabel("r")
-ylabel("t(r)")
-show()  
-     
+
            
     
         
