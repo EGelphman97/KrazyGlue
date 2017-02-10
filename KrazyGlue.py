@@ -1,5 +1,5 @@
 #Eric Gelphman
-#February 1, 2017 
+#February 9, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 
 #Function to perform a binary search through a list of tuples representing 
@@ -7,16 +7,16 @@
 #Note: In tuple structure, tuple[0] = r, tuple[1] = f(r)
 def binarySearch(r, data):
     low = 0
-    high = len(data - 1)
+    high = len(data) - 1
     found = False
     while low <= high and not found:
         pos = 0
-        mid = (low + high) / 2
-        if data[mid][0] == r:
+        mid = int((low + high) / 2)
+        if abs(data[mid][0] - r) <= 0.05:
             pos = mid
             found = True
         else:
-            if r < data[mid][0]:
+            if abs(data[mid][0] - r) > 0.05:
                 high = mid - 1
             else:
                 low = mid + 1
@@ -25,19 +25,26 @@ def binarySearch(r, data):
     else:                          #Value of f not found
         if low == high:
             high += 1
-        #linear interpolation    
+        #linear interpolation
         m = (data[high][1] - data[low][1]) / (data[high][0] - data[low][0])            
         return (m * r) - (m * data[high][0]) + data[high][1]
 
 #Function to calculate H using necessary parameters       
 def calculateH(r, t, fp, fpp): 
-    X, Y, dX_dr, dX_dt, dY_dr, dY_dt = 0.0
+    X = 0.0 
+    Y = 0.0
+    dX_dr = 0.0
+    dX_dt = 0.0  
+    dY_dr = 0.0
+    dY_dt = 0.0
     a = (4.5) ** (2/3)
     b = r - t 
     c = 1 - t
     pwr_13 = 1 / 3
     pwr_43 = 4 / 3
     #Calculate X, Y, and their partial based on r
+    #Note: Need to account for where divide by 0 errors occur, as well as
+    #when a negative value is under the square root 
     if r <= 0.9:                       #Schwarzchild Space
         X = 2 / ((6 * b) ** pwr_13)
         Y = (4.5 * (b ** 2)) ** pwr_13
@@ -81,42 +88,53 @@ def readFromFile(file1):
         f_data.append((float(split[0]), float(split[2])))
     return f_data
     
+#Function to check boundary conditions around r = 1.5   
+def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
+    #f'(r) and f''(r) need to be 0 at r = 1.5 or about there  
+    if(abs(f - r + 4/3) >= EPSILON or abs(fp - 1) >= EPSILON  or abs(fpp) >= EPSILON):
+        print("Boundary conditions not met!")
+        print("r = " + str(r) + " f(r) = " + str(f) + " f'(r) = " + str(fp) + " f''(r) = " + str(fpp))    
+    else:
+        print("Boundary Conditions Met!")    
+        
     
-#########################Actual Script Starts Here#############################    
-EPSILON = 0.00001
-STEP_SIZE = input("Enter the step size: ")
-file1 = open(input("Enter the name of the file that contains values of r and f(r): "), 'r')
-f_data = readFromFile(file1)
-file1.close()
-outputFileName = input("Enter the name of the file that will store the output values: ")
-file2 = open(outputFileName, 'r+')
-
-#Traversal
-f, fp, fpp = 0.0
-f_prev, fprime_prev, r_prev = 0.0
-r = 2.0
-while r >= -10000:
-    #f_data must be sorted in increasing order
-    f = binarySearch(r, f_data)
-    fp = f - f_prev / (r - r_prev)
-    fpp = fp - fprime_prev / (r - r_prev)
-    H = calculateH(r, f, fp, fpp)
-    line = str(r) + "_" + str(f) + "_" + str(fp) + "_" + str(fpp) + "_" + str(H)
-    file2.write(line)
-    f_prev = f
-    fprime_prev = fp  
-    r_prev = r
-    if r < -1:
-        STEP_SIZE += 0.1
-    r -= STEP_SIZE
-
-#Checking Boundary Conditions    
-if(f <= -10000 or fp >= EPSILON or fpp >= EPSILON):
-    print("Boundary conditions not met!")
-    print("r = " + str(r) + "f(r) = " + str(f) + "f'(r) = " + str(fp) + "f''(r) = " + str(fpp))    
-else:
-    print("Boundary Conditions Met!")    
+def main():    
+    #########################Actual Script Starts Here#############################    
+    EPSILON = 0.00001
+    STEP_SIZE = float(input("Enter the step size: "))
+    file1 = open(input("Enter the name of the file that contains values of r and f(r): "), 'r')
+    f_data = readFromFile(file1)
+    file1.close()
+    outputFileName = input("Enter the name of the file that will store the output values: ")
+    file2 = open(outputFileName, 'r+')
     
+    #Traversal
+    r = 2.0
+    f_prev = 0.0
+    fprime_prev = 0.0
+    r_prev = 0.0
+    while r >= -10000:
+        #f_data must be sorted in increasing order
+        f = binarySearch(r, f_data)
+        fp = f - f_prev / (r - r_prev)
+        fpp = fp - fprime_prev / (r - r_prev)
+        #Check boundary conditions around r = 1.5
+        if(r >= 1.4 and r <= 1.6):
+            checkBoundaryCondition(r, f, fp, fpp, EPSILON)
+        H = calculateH(r, f, fp, fpp)
+        line = str(r) + "_" + str(f) + "_" + str(fp) + "_" + str(fpp) + "_" + str(H) + "\n"
+        file2.write(line)
+        f_prev = f
+        fprime_prev = fp  
+        r_prev = r
+        if r < -1:
+            STEP_SIZE += 0.1
+        r -= STEP_SIZE
+        
+if __name__ == "__main__":
+    main()        
+
+
     
 
         
