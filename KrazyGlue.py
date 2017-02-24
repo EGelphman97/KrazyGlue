@@ -69,16 +69,18 @@ def calculateH(r, t, fp, fpp):
         dX_dt = ((t_0t)*(M)**2)**(-1 * pwr_13)*(1.46752322173095*r**3 - 2.73784801054179*r**2 + 1.36204499016903*r + (t_0t)*(-13.2077089955785*r**2 + 16.4270880632508*r - 4.0861349705071) + 0.183440402716368*(t_0t)*(Mp) + 0.105423199441097)/(t_0t)
         dY_dr = ((t_0t)**2*(4.5 * M))**pwr_13*(pwr_13*(t_0t)*(4.5 * M) + (t_0t)**2*(36.0*r**2 - 44.775*r + 11.1375))/((t_0t)**2*(4.5 * M))
         dY_dt = ((t_0t)**2*(4.5 * M))**pwr_13*(-1 * pwr_13*r + (2/3)*t - 0.3)/(t_0t)**2
-    H_Num = (2*fp*dY_dt) - ((X**3)*Y*dX_dr) + (X*Y*fp*(dX_dt + 2*fp*dX_dr)) - (2*(X**4)*dY_dr) - ((X**2)*(Y*fpp+2*fp*(dY_dt -fp*dY_dr)))
-    H_Denom = Y * ((X**2)/((X**2)-(fp**2))**(1/2)) * (((X**2)- (fp**2))**2)
-    #Check whether H is undefined
-    try:
-        H = H_Num / H_Denom
-    except ZeroDivisionError:
-        print("Error! H(r) undefined at r = ", r)
-        quit()
-    return H  
-
+    #Check so a negative number is not under the square root in the equation for H
+    if abs(X) < fp:
+        return "not real"
+    else:    
+        H_Num = (2*fp*dY_dt) - ((X**3)*Y*dX_dr) + (X*Y*fp*(dX_dt + 2*fp*dX_dr)) - (2*(X**4)*dY_dr) - ((X**2)*(Y*fpp+2*fp*(dY_dt -fp*dY_dr)))
+        H_Denom = Y * ((X**2)/((X**2)-(fp**2))**(1/2)) * (((X**2)- (fp**2))**2)
+        #Check whether H is undefined
+        if H_Denom == 0.0:
+            return "undefined"
+        else:
+            return H_Num / H_Denom
+    
 #Function to read values of r, f(r) from file and store them as a tuple <r, f(r)>
 #The tuples are then stored in ascending r-order in a list, which is returned   
 def readFromFile(file1):
@@ -89,17 +91,17 @@ def readFromFile(file1):
     return f_data
     
 #Function to check boundary conditions around r = 1.5   
+#f'(r) and f''(r) need to be 0 at r = 1.5 or about there  
 def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
-    #f'(r) and f''(r) need to be 0 at r = 1.5 or about there  
-    if(abs(f - r + 4/3) >= EPSILON or abs(fp - 1) >= EPSILON  or abs(fpp) >= EPSILON):
-        print("Boundary conditions not met!")
-        print("r = " + str(r) + " f(r) = " + str(f) + " f'(r) = " + str(fp) + " f''(r) = " + str(fpp))    
-    else:
-        print("Boundary Conditions Met!")    
+    if r >= 1.4 and r <= 1.6:
+        if(abs(f - r + 4/3) >= EPSILON or abs(fp - 1) >= EPSILON  or abs(fpp) >= EPSILON):
+            print("Boundary conditions not met!")
+            print("r = " + str(r) + " f(r) = " + str(f) + " f'(r) = " + str(fp) + " f''(r) = " + str(fpp))    
+        else:
+            print("Boundary Conditions Met!")    
         
     
-def main():    
-    #########################Actual Script Starts Here#############################    
+def main():     
     EPSILON = 0.00001
     STEP_SIZE = float(input("Enter the step size: "))
     file1 = open(input("Enter the name of the file that contains values of r and f(r): "), 'r')
@@ -119,14 +121,16 @@ def main():
         fp = f - f_prev / (r - r_prev)
         fpp = fp - fprime_prev / (r - r_prev)
         #Check boundary conditions around r = 1.5
-        if(r >= 1.4 and r <= 1.6):
-            checkBoundaryCondition(r, f, fp, fpp, EPSILON)
-        H = calculateH(r, f, fp, fpp)
-        line = str(r) + "_" + str(f) + "_" + str(fp) + "_" + str(fpp) + "_" + str(H) + "\n"
-        file2.write(line)
-        f_prev = f
-        fprime_prev = fp  
-        r_prev = r
+        #if (r >= 1.4 and r <= 1.6):
+            #checkBoundaryCondition(r, f, fp, fpp, EPSILON)
+        output = calculateH(r, f, fp, fpp)    
+        if (output != "not real" and output != "undefined"):    
+            H = output
+            line = "r: " + str(r) + " f: " + str(f) + " fp: " + str(fp) + " fpp: " + str(fpp) + " H: " + str(H) + "\n"
+            file2.write(line)
+            f_prev = f
+            fprime_prev = fp  
+            r_prev = r
         if r < -1:
             STEP_SIZE += 0.1
         r -= STEP_SIZE
