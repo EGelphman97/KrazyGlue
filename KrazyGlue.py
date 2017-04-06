@@ -37,40 +37,26 @@ def calculateH(r, t, fp, fpp):
     dX_dt = 0.0  
     dY_dr = 0.0
     dY_dt = 0.0
-    a = (4.5) ** (2/3)
-    b = r - t 
-    c = 1 - t
-    pwr_13 = 1 / 3
-    pwr_43 = 4 / 3
-    #Calculate X, Y, and their partial based on r
+    #Calculate X, Y, and their partial derivatives
     #Note: Need to account for where divide by 0 errors occur, as well as
     #when a negative value is under the square root 
     if r <= 0.9:                       #Schwarzchild Space
-        X = 2 / ((6 * b) ** pwr_13)
-        Y = (4.5 * (b ** 2)) ** pwr_13
-        dX_dr = -4 / ((6 * b) ** pwr_43)
-        dX_dt = 4 / ((6 * b) ** pwr_43)
-        dY_dr = 3 / (a * b ** pwr_13)
-        dY_dt = -3 / (a * b ** pwr_13)  
+        X = 2 / (6 * (r - t) ** (1/3))
+        Y = 1.65096 * ((r - t) ** (2/3)) 
+        dX_dr = -0.36688 / ((r - t) ** (4/3))
+        dX_dt = -dX_dr
+        dY_dr = 1.10064 / ((r - t) ** (1/3))
+        dY_dt = -dY_dr  
     elif r >= 1.1:                    #Friedman Space
-        X = (3 * (r ** 2) * c) / (((6 * (r ** 6)) * c) ** pwr_13)
-        Y = ((4.5 * r ** 3) * c ** 2) ** pwr_13
-        dX_dr = (36 * (r ** 2 - (r ** 2 * t) - 1 + t)) / ((6 ** pwr_43) * (r ** 3) * (c ** pwr_13))
-        dX_dt = (-12 * (r ** 8)) / (((6 * (r ** 6)) ** pwr_43) * c)
-        dY_dr = (4.5 ** pwr_13) * (c ** (2/3)) 
-        dY_dt = (-3 * r) / (a * (c ** pwr_13))   
-    else:                             #Glue Region
-        M = 8.0*r**3 - 14.925*r**2 + 7.425*r + 0.5747
-        Mp = 24.0*r**2 - 29.85*r + 7.425
-        t_0t = 0.5*r + 0.45 - t
-        X = ((t_0t)*(M)**2)**(-1 * pwr_13)*(4.40256966519284*r**3 - 8.21354403162538*r**2 + 4.0861349705071*r + 0.550321208149104*(t_0t)*(Mp) + 0.31626959832329)
-        Y = ((t_0t)**2*(4.5 * M))**pwr_13                             
-        dX_dr = ((t_0t)*(M)**2)**(-1 * pwr_13)*((t_0t)*(19.8115634933678*r**2 - 24.6406320948762*r + 0.550321208149104*(48.0*r - 29.85)*(t_0t) + 6.12920245576065)*(M) - (pwr_43*r**3 - 2.4875*r**2 + 1.2375*r + pwr_13*(t_0t)*(2*M) + 0.0957833333333333)*(4.40256966519284*r**3 - 8.21354403162538*r**2 + 4.0861349705071*r + 0.550321208149104*(t_0t)*(Mp) + 0.31626959832329))/((t_0t)*(M))
-        dX_dt = ((t_0t)*(M)**2)**(-1 * pwr_13)*(1.46752322173095*r**3 - 2.73784801054179*r**2 + 1.36204499016903*r + (t_0t)*(-13.2077089955785*r**2 + 16.4270880632508*r - 4.0861349705071) + 0.183440402716368*(t_0t)*(Mp) + 0.105423199441097)/(t_0t)
-        dY_dr = ((t_0t)**2*(4.5 * M))**pwr_13*(pwr_13*(t_0t)*(4.5 * M) + (t_0t)**2*(36.0*r**2 - 44.775*r + 11.1375))/((t_0t)**2*(4.5 * M))
-        dY_dt = ((t_0t)**2*(4.5 * M))**pwr_13*(-1 * pwr_13*r + (2/3)*t - 0.3)/(t_0t)**2
+        X = 1.65096 * ((1 - t) ** (2/3))
+        Y = 1.65096 * (((r ** 3) * ((1 - t) ** 2)) ** (1/3))
+        #dX_dr = 0.0
+        dX_dt = (-1.10064 * (r ** 2)) / ((-((r ** 6)*(t - 1))) ** (1/3))
+        dY_dr = (1.65096 * (r ** 2) * ((1 - t) ** 2)) / (((r ** 3) * ((1 - t) ** 2)) ** (2/3))
+        dY_dt = (-1.10064 * (r ** 3) * (1 - t)) / (((r ** 3) * ((1 - t) ** 2)) ** (2/3))
+    # TODO: Automtaic Gluing
     #Check so a negative number is not under the square root in the equation for H
-    if abs(X) < fp:
+    if abs(X) < abs(fp):
         return "not real"
     else:    
         H_Num = (2*fp*dY_dt) - ((X**3)*Y*dX_dr) + (X*Y*fp*(dX_dt + 2*fp*dX_dr)) - (2*(X**4)*dY_dr) - ((X**2)*(Y*fpp+2*fp*(dY_dt -fp*dY_dr)))
@@ -91,7 +77,7 @@ def readFromFile(file1):
     return f_data
     
 #Function to check boundary conditions around r = 1.5   
-#f'(r) and f''(r) need to be 0 at r = 1.5 or about there  
+#f'(r) and f''(r) need to be 0 at r = 1.5 or about there 
 def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
     if r >= 1.4 and r <= 1.6:
         if(abs(f - r + 4/3) >= EPSILON or abs(fp - 1) >= EPSILON  or abs(fpp) >= EPSILON):
@@ -102,7 +88,6 @@ def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
         
     
 def main():     
-    EPSILON = 0.00001
     STEP_SIZE = float(input("Enter the step size: "))
     file1 = open(input("Enter the name of the file that contains values of r and f(r): "), 'r')
     f_data = readFromFile(file1)
