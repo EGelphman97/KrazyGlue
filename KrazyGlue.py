@@ -1,33 +1,26 @@
 #Eric Gelphman
-#February 9, 2017 
+#April 14, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 
+#Perform a linear iterpolation if value of r is not found in numerical data
+def linInterpolate(r, data, low, high):
+    m = (data[high][1] - data[low][1]) / (data[high][0] - data[low][0]) #caluclate slope
+    return m * (r - low[0]) + low[1]   #point-slope form
+                
 #Function to perform a binary search through a list of tuples representing 
 #values of r and f(r)
 #Note: In tuple structure, tuple[0] = r, tuple[1] = f(r)
-def binarySearch(r, data):
-    low = 0
-    high = len(data) - 1
-    found = False
-    while low <= high and not found:
-        pos = 0
+def binarySearch(r, data, low, high):
+    if low <= high:
         mid = int((low + high) / 2)
-        if abs(data[mid][0] - r) <= 0.05:
-            pos = mid
-            found = True
-        else:
-            if abs(data[mid][0] - r) > 0.05:
-                high = mid - 1
-            else:
-                low = mid + 1
-    if found:                      #Value of f found
-        return data[pos][1]
-    else:                          #Value of f not found
-        if low == high:
-            high += 1
-        #linear interpolation
-        m = (data[high][1] - data[low][1]) / (data[high][0] - data[low][0])            
-        return (m * r) - (m * data[high][0]) + data[high][1]
+        if abs(data[mid][0] - r) <= 0.01:         #r value is withtin epsilon
+            return data[mid]
+        elif data[mid][0] - r < -0.01:            #data[mid][0] < r 
+            binarySearch(r, data, mid + 1, high)
+        else:                                     #data[mid][0] > r
+            binarySearch(r, data, low, mid - 1)
+    else:
+        return linInterpolate(r, data, low, high)
 
 #Function to calculate H using necessary parameters       
 def calculateH(r, t, fp, fpp): 
@@ -69,19 +62,24 @@ def calculateH(r, t, fp, fpp):
     else:    
         H_Num = (2*fp*dY_dt) - ((X**3)*Y*dX_dr) + (X*Y*fp*(dX_dt + 2*fp*dX_dr)) - (2*(X**4)*dY_dr) - ((X**2)*(Y*fpp+2*fp*(dY_dt -fp*dY_dr)))
         H_Denom = Y * ((X**2)/((X**2)-(fp**2))**(1/2)) * (((X**2)- (fp**2))**2)
-        #Check whether H is undefined
-        if H_Denom == 0.0:
-            return "undefined"
-        else:
-            return H_Num / H_Denom
+    #Check whether H is undefined
+    if H_Denom == 0.0:
+        return "undefined"
+    else:
+        return H_Num / H_Denom
     
 #Function to read values of r, f(r) from file and store them as a tuple <r, f(r)>
 #The tuples are then stored in ascending r-order in a list, which is returned   
-def readFromFile(file1):
-    f_data = []
-    for line in file1:
-        split = line.partition("_")
-        f_data.append((float(split[0]), float(split[2])))
+def readFromFile():
+    with open("test3.txt", "r") as lines:
+        f_data = []
+        for line in lines:
+            split = line.partition("_")
+            try:
+                f_data.append((float(split[0]), float(split[2])))
+            except ValueError:
+                break
+    lines.close()        
     return f_data
     
 #Function to check boundary conditions around r = 1.5   
@@ -96,26 +94,22 @@ def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
         
     
 def main():     
-    STEP_SIZE = float(input("Enter the step size: "))
-    file1 = open(input("Enter the name of the file that contains values of r and f(r): "), 'r')
-    f_data = readFromFile(file1)
-    file1.close()
-    outputFileName = input("Enter the name of the file that will store the output values: ")
-    file2 = open(outputFileName, 'r+')
-    
+    STEP_SIZE = 0.1
+    f_data = readFromFile()
+    file2 = open("output3.txt", 'r+')
     #Traversal
     r = 2.0
     f_prev = 0.0
     fprime_prev = 0.0
     r_prev = 0.0
-    while r >= -10000:
+    while r >= -9992.0:
         #f_data must be sorted in increasing order
         f = binarySearch(r, f_data)
         fp = f - f_prev / (r - r_prev)
         fpp = fp - fprime_prev / (r - r_prev)
         #Check boundary conditions around r = 1.5
         #if (r >= 1.4 and r <= 1.6):
-            #checkBoundaryCondition(r, f, fp, fpp, EPSILON)
+            #checkBoundaryCondition(r, f, fp, fpp, EPSILON)  
         output = calculateH(r, f, fp, fpp)    
         if (output != "not real" and output != "undefined"):    
             H = output

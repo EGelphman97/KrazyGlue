@@ -1,8 +1,8 @@
 #Eric Gelphman
-#February 9, 2017 
+#April 14, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 #fGenerator script to generate values of f
-from sympy import Symbol, sympify, pprint, simplify
+from sympy import Symbol, sympify, simplify
 
 #Class definition to more easily handle evaluation and writing to file
 class FunctionStruct:
@@ -20,8 +20,7 @@ class FunctionStruct:
         file1 = open(filename, 'r+')
         while r1 <= self.upper_limit:
             f = simplify(self.expression.subs({self.r:r1}))
-            line = str(r1) + "_" + str(f) + "\n"
-            file1.write(line)
+            file1.write(str(r1) + "_" + str(f) + "\n")
             r1 += self.step_size
         file1.close()  
 
@@ -29,17 +28,18 @@ class FunctionStruct:
 def main():        
     #################################Start of Actual Script########################        
     wfileN = input("Enter name of file that will store the data: ")
-    nF = int(input("Enter the number of segments that make up this function: "))
-    h = float(input("Enter the step size: "))
-    n = 1;
-    while n <= nF:
-        expr = sympify(input("Enter and expression f(r): "), evaluate=False)
-        pprint(expr)
-        lbound = float(input("Enter the lowest r value for which this segment is defined: "))
-        hbound = float(input("Enter the largest r value for which this segment is defined: "))
-        obj = FunctionStruct(expr, h, lbound, hbound)
-        obj.generateFile(wfileN)
-        n += 1
+    h = 0.1
+    expr_f = sympify("r - 4/3 - 1/(3*r) + 4/(9*r**2)", evaluate=False)
+    obj = FunctionStruct(expr_f, h, -10000, -10.2)
+    obj.generateFile(wfileN)
+    expr_glue = sympify("342.850*r**3 + 10282.990*r**2 + 102975.017*r + 342491.827", evaluate=False)
+    obj = FunctionStruct(expr_glue, h, -10.1, -9.9)
+    obj.generateFile(wfileN)
+    r = -9.8
+    fileW = open(wfileN, 'r+')
+    while r <= 2.0:
+        fileW.write(str(r) + "_" + "10.0" + "\n")
+        r += h
 
 if __name__ == "__main__":
     main()        
