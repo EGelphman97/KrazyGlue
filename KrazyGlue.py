@@ -22,7 +22,7 @@ def binarySearch(r, data, low, high):
             else:                                     #data[mid][0] > r
                 return binarySearch(r, data, low, mid - 1)
     else:
-        print(str(data[mid][0]) + " " + str(data[mid][1]))
+        print("interpolation needed")
         return linInterpolate(r, data, low, high)
 
 #Function to calculate H using necessary parameters       
@@ -37,7 +37,7 @@ def calculateH(r, t, fp, fpp):
     #Note: Need to account for where divide by 0 errors occur, as well as
     #when a negative value is under the square root 
     if r <= 0.9:                       #Schwarzchild Space
-        X = 2 / (6 * (r - t) ** (1/3))
+        X = 2 / ((6 * (r - t)) ** (1/3))
         Y = 1.65096 * ((r - t) ** (2/3)) 
         dX_dr = -0.36688 / ((r - t) ** (4/3))
         dX_dt = -dX_dr
@@ -105,16 +105,19 @@ def main():
     f = f_prev
     fprime_prev = 0.0
     r_prev = 2.1
-    while r >= -9999.7:
-        #f_data must be sorted in increasing order
+    while r >= -10000:
+         #f_data must be sorted in increasing order
         f = binarySearch(r, f_data, 0, len(f_data) - 1)
-        fp = f - f_prev / (r - r_prev)
-        fpp = fp - fprime_prev / (r - r_prev)
+        if r > -9.9 or r < -10.1:      #Not in the glue region
+            fp = (f - f_prev) / (r - r_prev)
+            fpp = (fp - fprime_prev) / (r - r_prev)
+        else:
+            fp = -0.4330 * r + 2.89165
+            fpp = -0.4330
         #Check boundary conditions around r = 1.5
         #if (r >= 1.4 and r <= 1.6):
             #checkBoundaryCondition(r, f, fp, fpp, EPSILON)  
-        output = calculateH(r, f, fp, fpp)   
-        print(output)
+        output = calculateH(r, f, fp, fpp)
         if (output != "not real" and output != "undefined"):    
             H = output
             line = "r: " + str(r) + " f: " + str(f) + " fp: " + str(fp) + " fpp: " + str(fpp) + " H: " + str(H) + "\n"

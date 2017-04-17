@@ -34,7 +34,7 @@ def main():
     expr_f = sympify("r - 4/3 - 1/(3*r) + 4/(9*r**2)", evaluate=False)
     obj = FunctionStruct(expr_f, h, -10000, -10.2)
     obj.generateFile(wfileN1)
-    expr_glue = sympify("342.850*r**3 + 10282.990*r**2 + 102975.017*r + 342491.827", evaluate=False)
+    expr_glue = sympify("-0.2165*r**2 + 2.89165*r + 39.8465", evaluate=False)
     obj = FunctionStruct(expr_glue, h, -10.1, -9.9)
     obj.generateFile(wfileN2)
     r = -9.8
