@@ -65,8 +65,8 @@ def calculateH(r, t, fp, fpp):
     if abs(X) < abs(fp):
         return "not real"
     else:    
-        H_Num = (2*fp*dY_dt) - ((X**3)*Y*dX_dr) + (X*Y*fp*(dX_dt + 2*fp*dX_dr)) - (2*(X**4)*dY_dr) - ((X**2)*(Y*fpp+2*fp*(dY_dt -fp*dY_dr)))
-        H_Denom = Y * ((X**2)/((X**2)-(fp**2))**(1/2)) * (((X**2)- (fp**2))**2)
+        H_Num = (2*(fp**3)*dY_dr) - ((X**3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2*(X**4)*dY_dt) - ((X**2)*((Y*fpp)+(2*fp)*(dY_dr - fp*dY_dt)))
+        H_Denom = X * Y * ((X**2 - fp**2)**(3/2))
     #Check whether H is undefined
     if H_Denom == 0.0:
         return "undefined"

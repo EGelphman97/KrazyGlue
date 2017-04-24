@@ -26,18 +26,18 @@ class FunctionStruct:
 
 
 def main():        
-    #################################Start of Actual Script########################        
+    #################################Start of Actual Script######################## 
     wfileN1 = "test3.txt"
     wfileN2 = "test3_1.txt"
     wfileN3 = "test3_2.txt"
     h = 0.01
     expr_f = sympify("r - 4/3 - 1/(3*r) + 4/(9*r**2)", evaluate=False)
-    obj = FunctionStruct(expr_f, h, -10000, -10.2)
+    obj = FunctionStruct(expr_f, h, -10000.0, -10.1)
     obj.generateFile(wfileN1)
     expr_glue = sympify("-335.9*r**3 - 10079.51*r**2 - 100809.622*r - 336055.909", evaluate=False)
     obj = FunctionStruct(expr_glue, h, -10.1, -9.9)
     obj.generateFile(wfileN2)
-    r = -9.8
+    r = -9.9
     fileW = open(wfileN3, 'r+')
     while r <= 2.0:
         fileW.write(str(r) + "_" + "-10.0" + "\n")
