@@ -1,6 +1,8 @@
 #Eric Gelphman
-#April 17, 2017 
+#April 23, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
+
+import matplotlib.pyplot as plt
 
 #Perform a linear iterpolation if value of r is not found in numerical data
 def linInterpolate(r, data, low, high):
@@ -10,17 +12,17 @@ def linInterpolate(r, data, low, high):
 #Function to perform a binary search through a list of tuples representing 
 #values of r and f(r)
 #Note: In tuple structure, tuple[0] = r, tuple[1] = f(r)
-def binarySearch(r, data, low, high):
-    EPSILON = 0.01
+def binarySearch(r, step_size, data, low, high):
+    EPSILON = step_size / 10.0
     if low <= high:
         mid = int((low + high) / 2)
         if abs(data[mid][0] - r) <= EPSILON:         #r value is withtin epsilon
             return data[mid][1]
         else:
             if data[mid][0] - r < 0:            #data[mid][0] < r 
-                return binarySearch(r, data, mid + 1, high)
+                return binarySearch(r, step_size, data, mid + 1, high)
             else:                                     #data[mid][0] > r
-                return binarySearch(r, data, low, mid - 1)
+                return binarySearch(r, step_size, data, low, mid - 1)
     else:
         print("interpolation needed")
         return linInterpolate(r, data, low, high)
@@ -93,27 +95,44 @@ def checkBoundaryCondition(r, f, fp, fpp, EPSILON):
             print("Boundary conditions not met!")
             print("r = " + str(r) + " f(r) = " + str(f) + " f'(r) = " + str(fp) + " f''(r) = " + str(fpp))    
         else:
-            print("Boundary Conditions Met!")    
+            print("Boundary Conditions Met!")  
+
+def graphH(r_vals, f_vals, H_vals):
+    #plt.plot(r_vals, f_vals)
+    #plt.xlabel("r")
+    #plt.ylabel("f(r)")
+    #plt.show()
+    plt.plot(r_vals, H_vals)
+    plt.xlabel("r")
+    plt.ylabel("H(r)")
+    plt.show()
+    
+    
+            
+            
         
 def main():     
     STEP_SIZE = 0.1
     f_data = readFromFile()
     file2 = open("output3.txt", 'r+')
+    r_vals = []
+    f_vals = []
+    H_vals = []
     #Traversal
     r = 2.0
-    f_prev = -10.0
-    f = f_prev
-    fprime_prev = 0.0
-    r_prev = 2.1
+    f = -10.0
     while r >= -10000:
          #f_data must be sorted in increasing order
-        f = binarySearch(r, f_data, 0, len(f_data) - 1)
-        if r > -9.9 or r < -10.1:      #Not in the glue region
-            fp = (f - f_prev) / (r - r_prev)
-            fpp = (fp - fprime_prev) / (r - r_prev)
+        f = binarySearch(r, STEP_SIZE, f_data, 0, len(f_data) - 1)
+        if r >= -9.9:      #Not in the glue region
+            fp = 0.0
+            fpp = 0.0
+        elif r <= -10.1:
+            fp = 1 + 1/(3*r**2) - 8/(9*r**3)
+            fpp = -2/(3*r**3) + 8/(3*r**4)
         else:
-            fp = -0.4330 * r + 2.89165
-            fpp = -0.4330
+            fp = -1007.7*r**2 - 20159.02*r - 100809.622
+            fpp = -2015.4*r -20159.02
         #Check boundary conditions around r = 1.5
         #if (r >= 1.4 and r <= 1.6):
             #checkBoundaryCondition(r, f, fp, fpp, EPSILON)  
@@ -122,12 +141,14 @@ def main():
             H = output
             line = "r: " + str(r) + " f: " + str(f) + " fp: " + str(fp) + " fpp: " + str(fpp) + " H: " + str(H) + "\n"
             file2.write(line)
-            f_prev = f
-            fprime_prev = fp  
-            r_prev = r
+            r_vals.append(r)
+            f_vals.append(f)
+            H_vals.append(H)
         if r < -1:
             STEP_SIZE += 0.1
         r -= STEP_SIZE
+    graphH(r_vals, f_vals, H_vals)        
+        
         
 if __name__ == "__main__":
     main()        
