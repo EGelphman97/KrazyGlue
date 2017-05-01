@@ -14,6 +14,8 @@ def linInterpolate(r, data, low, high):
 #Note: In tuple structure, tuple[0] = r, tuple[1] = f(r)
 def binarySearch(r, step_size, data, low, high):
     EPSILON = step_size / 10.0
+    if EPSILON > 0.01:
+        EPSILON = 0.01
     if low <= high:
         mid = int((low + high) / 2)
         if abs(data[mid][0] - r) <= EPSILON:         #r value is withtin epsilon
@@ -112,7 +114,8 @@ def graphH(r_vals, f_vals, H_vals):
             
         
 def main():     
-    STEP_SIZE = 0.1
+    STEP_SIZE = 0.01
+    MAX_STEP_SIZE = 1.0
     f_data = readFromFile()
     file2 = open("output3.txt", 'r+')
     r_vals = []
@@ -144,8 +147,9 @@ def main():
             r_vals.append(r)
             f_vals.append(f)
             H_vals.append(H)
-        if r < -1:
-            STEP_SIZE += 0.1
+        if r <= -10.2:  
+            if r == -10.2:#Increase step size
+                STEP_SIZE = 0.1
         r -= STEP_SIZE
     graphH(r_vals, f_vals, H_vals)        
         
