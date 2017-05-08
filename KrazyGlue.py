@@ -1,5 +1,5 @@
 #Eric Gelphman
-#April 23, 2017 
+#May 7, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 
 import matplotlib.pyplot as plt
@@ -26,7 +26,7 @@ def binarySearch(r, step_size, data, low, high):
             else:                                     #data[mid][0] > r
                 return binarySearch(r, step_size, data, low, mid - 1)
     else:
-        print("interpolation needed")
+        print("interpolation needed" + str(r))
         return linInterpolate(r, data, low, high)
 
 #Function to calculate H using necessary parameters       
@@ -115,7 +115,6 @@ def graphH(r_vals, f_vals, H_vals):
         
 def main():     
     STEP_SIZE = 0.01
-    MAX_STEP_SIZE = 1.0
     f_data = readFromFile()
     file2 = open("output3.txt", 'r+')
     r_vals = []
@@ -127,10 +126,10 @@ def main():
     while r >= -10000:
          #f_data must be sorted in increasing order
         f = binarySearch(r, STEP_SIZE, f_data, 0, len(f_data) - 1)
-        if r >= -9.9:      #Not in the glue region
+        if r >= -8.90:      #Not in the glue region
             fp = 0.0
             fpp = 0.0
-        elif r <= -10.1:
+        elif r <= -9.10:
             fp = 1 + 1/(3*r**2) - 8/(9*r**3)
             fpp = -2/(3*r**3) + 8/(3*r**4)
         else:
@@ -147,9 +146,6 @@ def main():
             r_vals.append(r)
             f_vals.append(f)
             H_vals.append(H)
-        if r <= -10.2:  
-            if r == -10.2:#Increase step size
-                STEP_SIZE = 0.1
         r -= STEP_SIZE
     graphH(r_vals, f_vals, H_vals)        
         
