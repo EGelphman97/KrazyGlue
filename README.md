@@ -1,3 +1,3 @@
 # KrazyGlue
-Python script to numerically solve the mean curvature equation in General Relativity where the user enters an equation f(r).
+Python script to numerically solve the mean curvature equation in General Relativity.
 Currently under development
