@@ -1,8 +1,9 @@
 #Eric Gelphman
-#May 7, 2017 
+#May 8, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 
 import matplotlib.pyplot as plt
+import fGenerator
 
 #Perform a linear iterpolation if value of r is not found in numerical data
 def linInterpolate(r, data, low, high):
@@ -26,7 +27,7 @@ def binarySearch(r, step_size, data, low, high):
             else:                                     #data[mid][0] > r
                 return binarySearch(r, step_size, data, low, mid - 1)
     else:
-        print("interpolation needed" + str(r))
+        print("interpolation needed r: " + str(r) + "low: " + str(low) + "high: " + str(high))
         return linInterpolate(r, data, low, high)
 
 #Function to calculate H using necessary parameters       
@@ -74,7 +75,8 @@ def calculateH(r, t, fp, fpp):
         return "undefined"
     else:
         return H_Num / H_Denom
-    
+
+"""        
 #Function to read values of r, f(r) from file and store them as a tuple <r, f(r)>
 #The tuples are then stored in ascending r-order in a list, which is returned   
 def readFromFile():
@@ -83,11 +85,12 @@ def readFromFile():
         for line in lines:
             split = line.partition("_")
             try:
-                f_data.append(((round(float(split[0]), 4)), round(float(split[2]), 5)))
+                f_data.append(((round(float(split[0]), 6)), round(float(split[2]), 7)))
             except ValueError:
                 break
     lines.close()        
     return f_data
+"""    
     
 #Function to check boundary conditions around r = 1.5   
 #f'(r) and f''(r) need to be 0 at r = 1.5 or about there 
@@ -113,28 +116,30 @@ def graphH(r_vals, f_vals, H_vals):
             
             
         
-def main():     
+def main():    
+    fileni = "test4.txt"
+    data = fGenerator.parametricGeneratorparametricGenerator(fileni)
+    fGenerator.graphf(data[0], data[1])
     STEP_SIZE = 0.01
-    f_data = readFromFile()
-    file2 = open("output3.txt", 'r+')
+    fileno = open("output3.txt", 'r+')
     r_vals = []
     f_vals = []
     H_vals = []
     #Traversal
-    r = 2.0
-    f = -10.0
-    while r >= -10000:
+    r = data[0][0]
+    f = data[1][0]
+    while r <= 2.0:
          #f_data must be sorted in increasing order
         f = binarySearch(r, STEP_SIZE, f_data, 0, len(f_data) - 1)
-        if r >= -8.90:      #Not in the glue region
+        if r <= -3.50:      #Not in the glue region
             fp = 0.0
             fpp = 0.0
-        elif r <= -9.10:
+        elif r >= -3.2798:
             fp = 1 + 1/(3*r**2) - 8/(9*r**3)
             fpp = -2/(3*r**3) + 8/(3*r**4)
         else:
-            fp = -1007.7*r**2 - 20159.02*r - 100809.622
-            fpp = -2015.4*r -20159.02
+            fp = -99.216*r**2 - 668.01*r - 1122.631
+            fpp = -198.432*r - 668.01
         #Check boundary conditions around r = 1.5
         #if (r >= 1.4 and r <= 1.6):
             #checkBoundaryCondition(r, f, fp, fpp, EPSILON)  
@@ -146,7 +151,7 @@ def main():
             r_vals.append(r)
             f_vals.append(f)
             H_vals.append(H)
-        r -= STEP_SIZE
+        r += STEP_SIZE
     graphH(r_vals, f_vals, H_vals)        
         
         
