@@ -110,11 +110,7 @@ def graphH(r_vals, f_vals, H_vals):
     plt.plot(r_vals, H_vals)
     plt.xlabel("r")
     plt.ylabel("H(r)")
-    plt.show()
-    
-    
-            
-            
+    plt.show() 
         
 def main():    
     fileni = "test4.txt"
@@ -130,15 +126,13 @@ def main():
     f = data[1][0]
     while r <= 2.0:
          #f_data must be sorted in increasing order
-        f = binarySearch(r, STEP_SIZE, f_data, 0, len(f_data) - 1)
+        f = binarySearch(r, STEP_SIZE, data, 0, len(data) - 1)
         if r <= -3.50:      #Not in the glue region
             fp = 0.0
             fpp = 0.0
         elif r >= -3.2798:
-            """
-            fp = 
-            fpp = -2/(3*r**3) + 8/(3*r**4)
-            """
+            #TODO
+            #Derivatives where f is parametric
         else:
             fp = -116.343*r**2 - 785.362*r - 1323.548
             fpp = -232.686*r - 785.362
@@ -149,7 +143,7 @@ def main():
         if (output != "not real" and output != "undefined"):    
             H = output
             line = "r: " + str(r) + " f: " + str(f) + " fp: " + str(fp) + " fpp: " + str(fpp) + " H: " + str(H) + "\n"
-            file2.write(line)
+            fileno.write(line)
             r_vals.append(r)
             f_vals.append(f)
             H_vals.append(H)
