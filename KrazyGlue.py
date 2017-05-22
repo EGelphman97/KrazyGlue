@@ -135,11 +135,13 @@ def main():
             fp = 0.0
             fpp = 0.0
         elif r >= -3.2798:
-            fp = 1 + 1/(3*r**2) - 8/(9*r**3)
+            """
+            fp = 
             fpp = -2/(3*r**3) + 8/(3*r**4)
+            """
         else:
-            fp = -99.216*r**2 - 668.01*r - 1122.631
-            fpp = -198.432*r - 668.01
+            fp = -116.343*r**2 - 785.362*r - 1323.548
+            fpp = -232.686*r - 785.362
         #Check boundary conditions around r = 1.5
         #if (r >= 1.4 and r <= 1.6):
             #checkBoundaryCondition(r, f, fp, fpp, EPSILON)  

@@ -19,8 +19,8 @@ def parametricGenerator(filename):
         r += 0.01
     #glue region
     while r < -3.2798:
-        #g(r) = -33.072r^3 - 334.005r^2 - 1122.631r - 1260.619
-        t = -33.072*r**3 - 334.005*r**2 - 1122.631*r - 1260.619
+        #g(r) = -38.781r^3 - 392.681r^2 - 1323.548r - 1489.831
+        t = -38.781*r**3 - 392.681*r**2 - 1323.548*r - 1489.831
         r_vals.append(r)
         t_vals.append(t)
         file1.write(str(r) + "_" + str(t) + "\n")  
