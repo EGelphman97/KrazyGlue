@@ -1,5 +1,5 @@
 #Eric Gelphman
-#May 15, 2017 
+#May 24, 2017 
 #KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
 #fGenerator script to generate values of f
 import math 
