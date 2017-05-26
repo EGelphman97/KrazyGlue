@@ -40,6 +40,11 @@ def parametricGenerator(filename):
             r = (10 - s)**(3/2) + t
             data[0].append(r)
             data[1].append(t)
+            rho3 = rho**3 - 1
+            fp = -5.45137/((2*rho)**(3/2)) - 3.85468/(rho**(3/2)*rho3) - 23.1281*rho**(3/2)/(rho3**2) + 3/(4*(10-s)**(1/2))
+            fpp = -27.0001/((2*rho)**(5/2)) - 9.54588/(rho**(5/2)*rho3) + 38.1835*(rho**(1/2))/(rho3**2) - 229.101*rho**(7/2)/(rho3**3) + 3/(8*(10-s)**(3/2))
+            data[2].append(fp)
+            data[3].append(fpp)
             s -= 0.001 
         file1.write("r: " + str(r) + " t: " + str(t) + " f': " + str(fp) + " f'' " + str(fpp) + "\n")         
     file1.close()
