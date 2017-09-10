@@ -32,26 +32,21 @@ Returns a pointer to an array which stores the values of r and fbar
 double* paraEvalFbar(double x)
 {
     double a,r,fbar;
-    double result[2];
-    double* resultPtr;
-    resultPtr = result;
-    a = 1 - x;
+    double* result = malloc(sizeof(double)*2);//Manually allocate memory for array
+    a = 1.0 - x;
     //Evaluation of r in the parametric region
     if(x < 5.551116e-17)//Linear approximation for r for very small x
-      r = 2*log(x) + 16/3 - log(4) - x;
+      r = 2*log(x) + 16/3 - log(4) - x;//Note that log(x) = ln(x)
     else//Regular evluation for r
       r = 4.0/(3*a) + 4*a - 4*atanh(a);
     result[0] = r;
+    fbar = ((double)4.0)/3.0 - 4.0/(3.0*pow(a,1.5));
+    /*
     if(r < -60.0)//10th Order Taylor Series Approximation in parametric region for large negative r
-      fbar = -2*x + 2.5*pow(x,2) - 2.91667*pow(x,3) - 3.28125*pow(x,4) - 3.60938*pow(x,5) - 3.91016*pow(x,6) - 4.18945*pow(x,7) - 4.45129*pow(x,8) - 4.70117*pow(x,9) - 4.93352*pow(x,10);
-    else if(r >= -60.0 && r <= -1.0)//Regular evaluation in parametric region
-      fbar = 4.0/3 - 4.0/(3*pow(a,1.5));
-    else if(r > -1.0 && r < -0.6)//Evaluation in glue region
-      fbar = -13.49319*pow(r,3) - 33.45508*pow(r,2) - 26.57345*r - 6.81477;
-    else// r >= -0.6, in linear region
-      fbar = -r - 0.6;
+      fbar = -2.0*x + 2.5*pow(x,2) - 2.91667*pow(x,3) - 3.28125*pow(x,4) - 3.60938*pow(x,5) - 3.91016*pow(x,6) - 4.18945*pow(x,7) - 4.45129*pow(x,8) - 4.70117*pow(x,9) - 4.93352*pow(x,10);
+      */
     result[1] = fbar;
-    return resultPtr;
+    return result;
 }
 
 /*Function to evaluate fbar in the glue(-1.0 < r < -0.6) and linear(r >= -0.6) regions,
@@ -86,9 +81,7 @@ Returns a pointer to an array which stores the values of the first and second de
 */
 double* evalDerivativesPara(double x)
 {
-    double deriv[2];
-    double* derivPtr;
-    derivPtr = deriv;
+    double* deriv = malloc(sizeof(double)*2);
     //fbar'
     deriv[0] = (-3.0*x*(65536 + 163840*x + 286720*pow(x,2) + 430080*pow(x,3) + 591360*pow(x,4) +
       768768*pow(x,5) + 960960*pow(x,6) + 1166880*pow(x,7) + 1385670*pow(x,8) +
@@ -105,7 +98,7 @@ double* evalDerivativesPara(double x)
       pow(3072 - 2560*x + 4864*pow(x,2) + 6528*pow(x,3) + 8384*pow(x,4) +
       10336*pow(x,5) + 12336*pow(x,6) + 14360*pow(x,7) + 16396*pow(x,8) +
       18438*pow(x,9) + 20483*pow(x,10),3);
-    return derivPtr;
+    return deriv;
 }
 
 /*Function to calculate the first and second order derivatives of fbar in the
@@ -120,9 +113,7 @@ double* evalDerivativesExplicit(double r)
 {
     double dfbar_1 = 0.0;
     double dfbar_2 = 0.0;//First, and second derivatives, respectively
-    double deriv[2];
-    double* derivPtr;
-    derivPtr = deriv;
+    double* deriv = malloc(sizeof(double)*2);
     if(r > -1.0 && r < -0.6)//Glue region
     {
       dfbar_1 = -40.47957*pow(r,2) - 66.91016*r -26.57345;
@@ -135,7 +126,7 @@ double* evalDerivativesExplicit(double r)
     }
     deriv[0] = dfbar_1;
     deriv[1] = dfbar_2;
-    return derivPtr;
+    return deriv;
 }
 
 /*Function needed to expose the C function paraEvalFbar()
@@ -147,11 +138,13 @@ value
 */
 static PyObject* fbarParaEval(PyObject* self, PyObject* args)
 {
-  double x;//Value of parameter x(from Python)
+  double x;
   if(!PyArg_ParseTuple(args, "d", &x))//If x is not a double, throw an exception
     return NULL;
   double* rfbar = paraEvalFbar(x);//Perform numerical evaluation
-  return Py_BuildValue("dd", *rfbar, *(rfbar + 1));//Build value to be returned to Python script
+  PyObject* result = Py_BuildValue("dd", rfbar[0], rfbar[1]);//Build value to be returned to Python script
+  free(rfbar);//Free memory alloctaed for the instantiation of the array
+  return result;
 }
 
 /*Function needed to expose the C function explicitEvalFbar()
@@ -181,7 +174,9 @@ static PyObject* calcDerivativesPara(PyObject* self, PyObject* args)
   if(!PyArg_ParseTuple(args, "d", &x))//If x is not a double, throw an exception
     return NULL;
   double* deriv = evalDerivativesPara(x);//Perform differentiation
-  return Py_BuildValue("dd", *deriv, *(deriv + 1));//Build value to be returned to Python script
+  PyObject* derivPy = Py_BuildValue("dd", deriv[0], deriv[1]);//Build value to be returned to Python script
+  free(deriv);//Free memory allocated during instantiation of array
+  return derivPy;//Return 2-tuple to Python script
 }
 
 /*Function needed to expose the C function evalDerivativesExplicit()
@@ -196,7 +191,9 @@ static PyObject* calcDerivativesExplicit(PyObject* self, PyObject* args)
   if(!PyArg_ParseTuple(args, "d", &r))
     return NULL;//If r is not a double, throw an exception
   double* deriv = evalDerivativesExplicit(r);//Perform differentiation
-  return Py_BuildValue("dd", *deriv, *(deriv + 1));//Build value to be returned to Python script
+  PyObject* derivPy = Py_BuildValue("dd", deriv[0], deriv[1]);//Build value to be returned to Python script
+  free(deriv);//Free memory allocated during instantiation of array
+  return derivPy;//Return 2-tuple to Python script
 }
 
 //Mapping of the names of Python methods to C functions
@@ -218,8 +215,7 @@ static struct PyModuleDef fulmineModule = {
 };
 
 //Function to initialize the module
-PyMODINIT_FUNC
-PyInit_Fulmine(void)
+PyMODINIT_FUNC PyInit_fulmine(void)
 {
     return PyModule_Create(&fulmineModule);
 }

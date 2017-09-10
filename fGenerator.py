@@ -1,41 +1,55 @@
-#Eric Gelphman
-#June 27, 2017
-#KrazyGlue Algorithm to investigate the mean curvature of spacetime near Black Holes
-#fGenerator script to generate values of f
+"""
+Eric Gelphman
+University of California San Diego(UCSD)
+Department of Mathematics
+Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
+September 9, 2017
+
+fGenerator script to generate values of r, fbar, fbar', and fbar'' and store them in such a
+way that KrazyGlue can then efficiently calculate the mean curvature H
+"""
+
 import math
-import Fulmine
+import fulmine
 import matplotlib.pyplot as plt
 
-#Function to generate values for r, fbar = f - r - 4/3, fbar', and fbar'' in all 3 regions:
+#Function to generate values for r, fbar = f - r + 4/3, fbar', and fbar'' in all 3 regions:
 #parametric, gluing, and linear
 #Note: All arithmetic operations are done by Fulmine
 #Returns list of 4-tuples with values organized in this format [r, f(r), f'(r), f''(r)]
 def generator4():
     r = -5.0
-    f_bar = fp = fpp = 0.0
-    x = 1.0e-308
+    f_bar = 0.0
+    x = float(1.0e-307)
     #data is a list of 4-tuples that holds the 4 essential values: r, fbar = f - r + 4/3, fbar', and fbar''
     data = []
-    #Traversal starts from left side (r -> negative infinity) in the parametric region
-    while r <= -1.0:
-        rfbar_para = peFbar(x)
-        deriv_para = peCalcDeriv(x)
-        data.append((rfbar_para[0], rfbar_para[1], deriv_para[0], deriv_para[1])) #Append to list
-        print("x: " + str(x) + " r: " + str(r) + " f_bar: " + str(f_bar) + "\n")
-        x += 0.000000000000001
-    while r > -1.0 and r <= 2.0:
-        fbar = eeFbar(r)
-        deriv_explicit = eeCalcDeriv(r)
-        data.append((r, fbar, deriv_explicit[0], deriv_explicit[1]))
-        r += 0.01
+    #Loop starts from left side (r -> negative infinity) in the parametric region
+    while r < 2.0:
+        if r <= -1.0:
+            rfbar_para = fulmine.peFbar(x)#Evaluate r and fbar at this value for x
+            r = rfbar_para[0]#rfbar_para[1] = fbar
+            fbar = rfbar_para[1]
+            #deriv_para = fulmine.peCalcDeriv(x)#Calculate fbar' and fbar'' for this value of x
+            data.append((r, rfbar_para[1], 0.0, 0.0)) #Append 4-tuple to list
+            #r is defined in terms of x, so increase x to increase r and continue loop
+            if x < 5.551116e-35:
+                x *= 10.0
+            elif x > 5.551116e-35 and x < 5.551116e-17:
+                x *= 5.0
+            else:
+                x += 1.0e-5
+        else:
+            fbar = fulmine.eeFbar(r)#Evaluate fbar explicitly in terms of r
+            #deriv_explicit = fulmine.eeCalcDeriv(r)#Calculate fbar' and fbar'' for this value of r
+            data.append((r, fbar, 0.0, 0.0))#Append 4-tuple to list
+            r += 0.0001#fbar is defined explicitly in terms of r here
     return data  #return list
 
 
-
+#Function to write the numerical data to a file
 def writeToFile(filename, data):
-    file1 = open(filename, 'r+') #open file
-    for i in data:
-         #write to file
+    file1 = open(filename, 'r+')#open file
+    for i in data:#Write each 4-tuple to file
         file1.write("r: " + str(i[0]) + " f_bar: " + str(i[1]) + " f_bar': " + str(i[2]) + " f_bar'': " + str(i[3]) + "\n")
     file1.close()#close file
 
@@ -47,19 +61,14 @@ def graphf(r_vals, t_vals):
     plt.show()
 
 def main():
-    fData = generator4()
-    #Ask user if they want file of numerical data in addition to graph
-    print("Enter 1 to generate file of numerical data, enter 0 to end\n")
-    response = int(input())
-    if response == 1:
-        writeToFile("test7.txt", fData)
-    #Graph r vs. t
+    fData = generator4()#Do entire numerical evaluation
+    writeToFile("test7.txt", fData)#Write numerical data to file
     r_vals = []
     fbar_vals = []
     for i in fData:
         r_vals.append(i[0])
         fbar_vals.append(i[1])
-    graphf(r_vals, fbar_vals)
+    graphf(r_vals, fbar_vals)#Graph r vs. t
 
 if __name__ == "__main__":
     main()
