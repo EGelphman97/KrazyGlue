@@ -3,7 +3,7 @@ Eric Gelphman
 University of California San Diego(UCSD)
 Department of Mathematics
 Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-September 9, 2017
+September 17, 2017
 
 fGenerator script to generate values of r, fbar, fbar', and fbar'' and store them in such a
 way that KrazyGlue can then efficiently calculate the mean curvature H
@@ -20,7 +20,7 @@ import matplotlib.pyplot as plt
 def generator4():
     r = -5.0
     f_bar = 0.0
-    x = float(1.0e-307)
+    x = 1.0e-307
     #data is a list of 4-tuples that holds the 4 essential values: r, fbar = f - r + 4/3, fbar', and fbar''
     data = []
     #Loop starts from left side (r -> negative infinity) in the parametric region
@@ -29,20 +29,20 @@ def generator4():
             rfbar_para = fulmine.peFbar(x)#Evaluate r and fbar at this value for x
             r = rfbar_para[0]#rfbar_para[1] = fbar
             fbar = rfbar_para[1]
-            #deriv_para = fulmine.peCalcDeriv(x)#Calculate fbar' and fbar'' for this value of x
-            data.append((r, rfbar_para[1], 0.0, 0.0)) #Append 4-tuple to list
+            deriv_para = fulmine.peCalcDeriv(x, r)#Calculate fbar' and fbar'' for this value of x
+            data.append((r, rfbar_para[1], deriv_para[0], deriv_para[1])) #Append 4-tuple to list
             #r is defined in terms of x, so increase x to increase r and continue loop
-            if x < 5.551116e-35:
-                x *= 10.0
-            elif x > 5.551116e-35 and x < 5.551116e-17:
-                x *= 5.0
+            if x < 1.0e-10:
+                x *= 1.2
+            elif x > 1.0e-20 and x < 1.0e-5:
+                x *= 1.1
             else:
-                x += 1.0e-5
+                x += 5.0e-5
         else:
             fbar = fulmine.eeFbar(r)#Evaluate fbar explicitly in terms of r
-            #deriv_explicit = fulmine.eeCalcDeriv(r)#Calculate fbar' and fbar'' for this value of r
-            data.append((r, fbar, 0.0, 0.0))#Append 4-tuple to list
-            r += 0.0001#fbar is defined explicitly in terms of r here
+            deriv_explicit = fulmine.eeCalcDeriv(r)#Calculate fbar' and fbar'' for this value of r
+            data.append((r, fbar, deriv_explicit[0], deriv_explicit[1]))#Append 4-tuple to list
+            r += 0.001#fbar is defined explicitly in terms of r here
     return data  #return list
 
 
@@ -60,8 +60,10 @@ def graphf(r_vals, t_vals):
     plt.ylabel("fbar(r)")
     plt.show()
 
+"""
 def main():
     fData = generator4()#Do entire numerical evaluation
+    print(str(len(fData)))
     writeToFile("test7.txt", fData)#Write numerical data to file
     r_vals = []
     fbar_vals = []
@@ -72,3 +74,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+"""
