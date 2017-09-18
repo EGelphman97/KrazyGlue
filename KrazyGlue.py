@@ -28,18 +28,17 @@ def main():
     #Step size is 1 index in list
     for i in data:
         r = i[0]
-        if r > -941.0:#If r <= -941.0, difference between H_Denom and 0 is less than double precision
-            fbar = i[1]
-            dfbar_1 = i[2]
-            dfbar_2 = i[3]
-            if(r <= -40.0):
-                H = fGenerator.fulmine.calcHLNr(r, fbar, dfbar_1, dfbar_2)#Pass values of r, fbar, fbar', fbar''
-            else:
-                H = fGenerator.fulmine.calcH(r, fbar + r - 4.0/3.0, dfbar_1 + 1, dfbar_2)#Pass values of r, f, f', f'' = fbar''
-            line = "r: " + str(r) + " H: " + str(H) + "\n"
-            ofilen.write(line)
-            r_vals.append(r)
-            H_vals.append(H)
+        fbar = i[1]
+        dfbar_1 = i[2]
+        dfbar_2 = i[3]
+        if(r <= -40.0):
+            H = fGenerator.fulmine.calcHLNr(r, fbar, dfbar_1, dfbar_2)#Pass values of r, fbar, fbar', fbar''
+        else:
+            H = fGenerator.fulmine.calcH(r, fbar + r - 4.0/3.0, dfbar_1 + 1, dfbar_2)#Pass values of r, f, f', f'' = fbar''
+        line = "r: " + str(r) + " H: " + str(H) + "\n"
+        ofilen.write(line)
+        r_vals.append(r)
+        H_vals.append(H)
     ofilen.close()
     graphH(r_vals, H_vals)
 

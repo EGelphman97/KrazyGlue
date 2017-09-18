@@ -141,7 +141,7 @@ Return: Pointer to a double that stores the value of the mean curvature H
 */
 double* calculateHLNr(double r, double fbar, double fbarp, double fpp)
 {
-  double Xbar, Y, a, b, z, H_Denom;
+  double X, Xbar, Y, a, b, z, H_Num, H_Denom;
   static double H;
   z = -fbar + 4.0/3.0;//z = r - t, t = fbar + r - 4/3
   a = pow(z, 1.0/3.0);
@@ -153,14 +153,13 @@ double* calculateHLNr(double r, double fbar, double fbarp, double fpp)
          (9*pow(3,0.3333333333333333)*pow(a-b,7))/(16.0*pow(2,0.6666666666666666)) + (9*pow(3,0.6666666666666666)*pow(a-b,8))/(32.0*pow(2,0.3333333333333333)) -
          (27*pow(a-b,9))/64.0 + (27*pow(3,0.3333333333333333)*pow(a-b,10))/(64.0*pow(2,0.6666666666666666));
   Y = pow(4.50, 1.0/3.0)*pow(z, 2.0/3.0);
-  double X = Xbar + 1;
-  H_Denom = X * Y * pow(pow(Xbar,2) + 2.0*Xbar - pow(fbarp,2) - 2.0*fbarp, 1.5);
-  /*
+  X = pow(2,0.6666666666666666)/(pow(3,0.3333333333333333)*pow(z,0.3333333333333333));
+  H_Denom = X * Y * pow(pow(X,2) - pow(fbar,2), 1.5);
   if(H_Denom == 0.0)//If the denominator = 0, throw an exception
   {
     printf("Error! Cannot Divide by 0!\n");
     return NULL;
-  }*/
+  }
   //double aleph = 2.0 + (-fbar)/2.0 + pow(-fbar,2)/4.0 - (7*pow(-fbar,3))/48.0 + (35*pow(-fbar,4))/384.0 - (91*pow(-fbar,5))/1536.0;
   double alpha = 11.0 - (9*(-fbar))/4.0 + (21*pow(-fbar,2))/16.0 - (55*pow(-fbar,3))/64.0 + (151*pow(-fbar,4))/256.0 - (425*pow(-fbar,5))/1024.0;
   double beta = 19.5 - (21*(-fbar))/8.0 + (51*pow(-fbar,2))/32.0 - (137*pow(-fbar,3))/128.0 + (383*pow(-fbar,4))/512.0 -
@@ -171,14 +170,13 @@ double* calculateHLNr(double r, double fbar, double fbarp, double fpp)
                  (6545*pow(-fbar,6))/4608.0;
   double epsilon = 0.5 - (3*(-fbar))/8.0 + (9*pow(-fbar,2))/32.0 - (27*pow(-fbar,3))/128.0 + (81*pow(-fbar,4))/512.0 - (243*pow(-fbar,5))/2048.0 +
                    (729*pow(-fbar,6))/8192.0;
-  double zeta = 2.0 + fbar/2.0 + pow(-fbar,2)/4.0 - (7*pow(-fbar,3))/48. + (35*pow(-fbar,4))/384.0 - (91*pow(-fbar,5))/1536.0 +
+  double zeta = 2.0 + fbar/2.0 + pow(-fbar,2)/4.0 - (7*pow(-fbar,3))/48.0 + (35*pow(-fbar,4))/384.0 - (91*pow(-fbar,5))/1536.0 +
                 (91*pow(-fbar,6))/2304.0;
   double eta = -4.0 + 3*(-fbar) - (9*pow(-fbar,2))/4.0 + (27*pow(-fbar,3))/16.0 - (81*pow(-fbar,4))/64.0 + (243*pow(-fbar,5))/256.0 -
                (729*pow(-fbar,6))/1024.0;
-  printf("Term: %.100lf\n", gamma + delta + epsilon + zeta + eta);
-  double H_Num = 2.0*X*pow(fbarp, 3) + alpha*pow(fbarp, 2) + beta*fbarp + gamma + delta + epsilon + zeta + eta - 2.0*fpp;
+  H_Num = 2.0*X*pow(fbarp, 3) + alpha*pow(fbarp, 2) + beta*fbarp + gamma + delta + epsilon + zeta + eta - 2.0*fpp;
   H = H_Num / H_Denom;
-  double* H_Ptr = &H_Denom;
+  double* H_Ptr = &H;
   return H_Ptr;
 }
 
