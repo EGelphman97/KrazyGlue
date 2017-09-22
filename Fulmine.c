@@ -2,9 +2,11 @@
   University of California San Diego(UCSD)
   Department of Mathematics
   Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-  September 17, 2017
+
+  September 22, 2017
 
   Fulmine, a C module to perform arithmetic operations for fGenerator and KrazyGlue.
+  Version 1.0.2
 */
 
 #include <Python.h>//Header file needed to interface with Python
@@ -21,8 +23,8 @@ static char derivPara_docstring[] =
     "Function to calculate the first and second derivatives of fbar in the parametric region";
 static char derivExplicit_docstring[] =
     "Function to calculate the first and second derivatives of fbar in the glue and linear regions, where it is explicitly defined";
-static char calcH_docstring[] = "Function to calculate the mean curvature H";
-static char calcHLNr_docstring[] = "Function to calculate the mean curvature H when r is a large negative number";
+static char calcHS_docstring[] = "Function to calculate the mean curvature H in the Schwarzschild region ";
+static char calcHGF_docstring[] = "Function to calculate the mean curvature H in the Friedman and glue regions";
 
 /*Function to evaluate r and fbar in the parametric region(r <= -1.0), where both
 r and fbar(r) = t are defined in terms of the parameter x
@@ -36,28 +38,20 @@ double* paraEvalFbar(double x)
     double a,r,fbar;
     double* result = malloc(sizeof(double)*2);//Manually allocate memory for array
     a = 1.0 - x;
-    //Evaluation of r in the parametric region
-    if(x < 1.0e-16)//10th order Taylor series approximation for r for very small x
-    {
-      r = 5.333333333333333 - (5*x)/3.0 + (19*pow(x,2))/12.0 + (17*pow(x,3))/12.0 + (131*pow(x,4))/96.0 + (323*pow(x,5))/240.0 + (257*pow(x,6))/192.0 +
-          (1795*pow(x,7))/1344.0 + (4099*pow(x,8))/3072.0 + (3073*pow(x,9))/2304.0 + (20483*pow(x,10))/15360.0 - 2.0*log(2.0) + 2.0*log(x);
-      //Note that log(x) = ln(x)
-    }
-    else//Regular evluation for r
-      r = 4.0/(3.0*a) + 4.0*a - 4.0*atanh(a);
+    r = 4.0/(3.0*a) + 4.0*a - 2.0*log(2.0 - x) + 2.0*log(x);//Evaluation of r in the parametric region
     result[0] = r;
-    if(r < -60.0)//10th order Taylor series approximation in parametric region for large negative r
+    if(r < -10.0)//6th order Taylor series approximation in parametric region for large negative r
     {
-      fbar = -2.0*x - (5*pow(x,2))/2.0 - (35*pow(x,3))/12.0 - (105*pow(x,4))/32.0 - (231*pow(x,5))/64.0 - (1001*pow(x,6))/256.0 -
-             (2145*pow(x,7))/512.0 - (36465*pow(x,8))/8192.0 - (230945*pow(x,9))/49152.0 - (323323*pow(x,10))/65536.0;
+      fbar = -2.0*x - (5*pow(x,2))/2.0 - (35*pow(x,3))/12.0 - (105*pow(x,4))/32.0 - (231*pow(x,5))/64.0 - (1001*pow(x,6))/256.0;/* -
+             (2145*pow(x,7))/512.0 - (36465*pow(x,8))/8192.0 - (230945*pow(x,9))/49152.0 - (323323*pow(x,10))/65536.0;*/
     }
     else//Regular evaluation for fbar
-      fbar = 4.0/3.0 - 4.0/(3.0*pow(a,1.5));
+      fbar = ((double)4.0)/3.0 - 4.0/(3.0*pow(a,1.5));
     result[1] = fbar;
     return result;
 }
 
-/*Function to evaluate fbar in the glue(-1.0 < r < -0.6) and linear(r >= -0.6) regions,
+/*Function to evaluate fbar in the glue(-1.0 < r < -0.8) and linear(r >= -0.8) regions,
 where it is explicitly defined in terms of the independent variable r
 
 Parameter r is the value of r that fbar is to be evaluated at
@@ -67,17 +61,17 @@ Returns a double which is the value of fbar for the input value of r
 double explicitEvalFbar(double r)
 {
     double result = 0.0;
-    if(r > -1.0 && r < -0.6)//Evaluation in glue region
-      result = 5.4215319*pow(r,3) + 11.9073083*pow(r,2) + 7.4335155*r + 0.7445292;
-    else if(r >= -0.6)//Evaluation in linear region
-      result = -1.0*r - 1.2;
+    if(r > 0.1 && r < 0.5)//Evaluation in glue region
+      result = -1.84115*pow(r,3) + 0.720532*pow(r,2) - 0.33949*r - 0.380199;
+    else if(r >= 0.5)//Evaluation in linear region
+      result = -r - 0.1;
     return result;
 }
 
 /*Function to calculate the first and second order derivatives of fbar in
 the parametric region
 
-For r <= -100.0, taylor series of derivative is used for the numerical evaluation,
+For r <= -50.0, taylor series of derivative is used for the numerical evaluation,
 otherwise the derivative is evaluated using its explicit formula
 
 Parameter x is the value of x the formula is to be evaluated at, r is the corresponding r-value
@@ -88,19 +82,9 @@ double* evalDerivativesPara(double x, double r)
 {
     double* deriv = malloc(sizeof(double)*2);
     double d1, d2;//fbar', fbar''
-    if(r <= -60.0)//10th-order Taylor series expansion
-    {
-      d1 = -x - 3.0*pow(x,2) - (25*pow(x,3))/8.0 + (37*pow(x,4))/8.0 + (2817*pow(x,5))/128.0 + (1891*pow(x,6))/64.0 - (22129*pow(x,7))/1024.0 -
-      (165207*pow(x,8))/1024.0 - (8666971*pow(x,9))/32768.0 + (225585*pow(x,10))/4096.0;
-      d2 = -x/2.0 - (13*pow(x,2))/4.0 - (79*pow(x,3))/16.0 + (575*pow(x,4))/32.0 + (24453*pow(x,5))/256.0 + (69255*pow(x,6))/512.0 -
-           (580671*pow(x,7))/2048.0 - (6626277*pow(x,8))/4096.0 - (164430675*pow(x,9))/65536.0 + (381990279*pow(x,10))/131072.0;
-    }
-    else//Explicit evaluation
-    {
-      d1 = -2/((-4 + 2/pow(1 - x,2.5) - 4/((-2 + x)*x))*pow(1 - x,2.5));
-      d2 = -((-2 + x)*pow(-1 + x,6)*x*(-4 - 10*x + 5*pow(x,2)))/(2.0*pow(2*sqrt(1 - x) + (2 - 8*sqrt(1 - x))*x +
-           (-1 + 12*sqrt(1 - x))*pow(x,2) - 8*sqrt(1 - x)*pow(x,3) + 2*sqrt(1 - x)*pow(x,4),3));
-    }
+    d1 = (x*(x -2))/(2*pow(1 - x, 4.5) - x*(x - 2));
+    d2 = -((-2 + x)*pow(-1 + x,6)*x*(-4 - 10*x + 5*pow(x,2)))/(2.0*pow(2*sqrt(1 - x) + (2 - 8*sqrt(1 - x))*x +
+          (-1 + 12*sqrt(1 - x))*pow(x,2) - 8*sqrt(1 - x)*pow(x,3) + 2*sqrt(1 - x)*pow(x,4),3));
     deriv[0] = d1;
     deriv[1] = d2;
     return deriv;
@@ -118,12 +102,12 @@ double* evalDerivativesExplicit(double r)
 {
     double dfbar_1, dfbar_2;//First, and second derivatives, respectively
     double* deriv = malloc(sizeof(double)*2);
-    if(r > -1.0 && r < -0.6)//Glue region
+    if(r > 0.1 && r < 0.5)//Glue region
     {
-      dfbar_1 = 16.2645957*pow(r,2) + 23.8146166*r + 7.4335155;
-      dfbar_2 = 32.5291914*r + 23.8146166;
+      dfbar_1 = -5.52345*pow(r,2) + 1.44106*r - 0.33949;
+      dfbar_2 = -11.0469*r + 1.44106;
     }
-    else//Linear region (r >= -0.6)
+    else//Linear region (r >= 0.5)
     {
       dfbar_1 = -1.0;
       dfbar_2 = 0.0;
@@ -133,81 +117,96 @@ double* evalDerivativesExplicit(double r)
     return deriv;
 }
 
-/*Function to calculate H for when r is a large negative number
+/*Function to calculate H in the Schwarzschild region M(r) = 1, t0(r) = r, applies for all r <= 0.8
 
-Paramters: r, t, fp, fpp are the values of r, t, f'(r), and f''(r) from fGenerator(fbar converted to f)
+Paramters: r, fbar, fbarp, fpp are the values of r, fbar, fbar', and fbar'' from fGenerator
 
 Return: Pointer to a double that stores the value of the mean curvature H
 */
-double* calculateHLNr(double r, double fbar, double fbarp, double fpp)
+double* calculateHS(double r, double fbar, double fbarp, double fpp)
 {
-  double X, Xbar, Y, a, b, z, H_Num, H_Denom;
+  double X, Y, z, H_Num, H_Denom;
   static double H;
   z = -fbar + 4.0/3.0;//z = r - t, t = fbar + r - 4/3
-  a = pow(z, 1.0/3.0);
-  b = pow(4.0/3.0, 1.0/3.0);
-  //Express Xbar = X - 1 as a 10th-order Taylor series centered around (r - t)^(1/3) = (4/3)^(1/3)
-  Xbar = -((pow(3,0.3333333333333333)*(a-b))/pow(2,0.6666666666666666)) + (pow(3,0.6666666666666666)*pow(a-b,2))/(2.0*pow(2,0.3333333333333333)) -
-         (3*pow(a-b,3))/4.0 + (3*pow(3,0.3333333333333333)*pow(a-b,4))/(4.0*pow(2,0.6666666666666666)) -
-         (3*pow(3,0.6666666666666666)*pow(a-b,5))/(8.0*pow(2,0.3333333333333333)) + (9*pow(a-b,6))/16.0 -
-         (9*pow(3,0.3333333333333333)*pow(a-b,7))/(16.0*pow(2,0.6666666666666666)) + (9*pow(3,0.6666666666666666)*pow(a-b,8))/(32.0*pow(2,0.3333333333333333)) -
-         (27*pow(a-b,9))/64.0 + (27*pow(3,0.3333333333333333)*pow(a-b,10))/(64.0*pow(2,0.6666666666666666));
-  Y = pow(4.50, 1.0/3.0)*pow(z, 2.0/3.0);
-  X = pow(2,0.6666666666666666)/(pow(3,0.3333333333333333)*pow(z,0.3333333333333333));
-  H_Denom = X * Y * pow(pow(X,2) - pow(fbar,2), 1.5);
-  if(H_Denom == 0.0)//If the denominator = 0, throw an exception
+  //printf("r: %.3lf fbar: %.60lf z: %.60lf\n", r, fbar, z);
+  Y = pow(4.50, ((double)1.0)/3.0)*pow(z, ((double)2.0)/3.0);
+  if(r <= -35.0)
   {
-    printf("Error! Cannot Divide by 0!\n");
+    double Xbar = ((fbar)/4.0 - (3*pow(-fbar,2))/8.0 - (53*pow(-fbar,3))/288.0 - (25*pow(-fbar,4))/768.0 - (41*pow(-fbar,5))/27648.0)/
+                  (1.0 + 2.0*(-fbar) + (13*pow(-fbar,2))/9.0 + (65*pow(-fbar,3))/144.0 + (65*pow(-fbar,4))/1152.0 +
+                  (13*pow(-fbar,5))/6912.0);
+    X = Xbar + 1.0;
+    H_Denom = X * Y * (pow(pow(Xbar,2) + 2.0*Xbar - pow(fbarp,2) - 2.0*fbarp, 1.5));
+    double aleph = (2 + (7*(-fbar))/2.0 + (77*pow(-fbar,2))/36.0 + (77*pow(-fbar,3))/144.0 + (55*pow(-fbar,4))/1152.0 + (11*pow(-fbar,5))/13824.0)/
+                   (1 + 2*(-fbar) + (13*pow(-fbar,2))/9.0 + (65*pow(-fbar,3))/144.0 + (65*pow(-fbar,4))/1152.0 + (13*pow(-fbar,5))/6912.);
+    double alpha = (5 + (1609*(-fbar))/168.0 + (38305*pow(-fbar,2))/6048.0 + (27353*pow(-fbar,3))/16128.0 + (31081*pow(-fbar,4))/193536.0 + (407*pow(-fbar,5))/145152.0)/
+                   (1 + (347*(-fbar))/168.0 + (2327*pow(-fbar,2))/1512.0 + (2665*pow(-fbar,3))/5376.0 + (6175*pow(-fbar,4))/96768.0 + (5083*pow(-fbar,5))/2.322432e6);
+    double beta = (1.5 + (4647*(-fbar))/938.0 + (48949*pow(-fbar,2))/11256.0 + (499361*pow(-fbar,3))/360192.0 + (211511*pow(-fbar,4))/1.440768e6 + (5885*pow(-fbar,5))/2.161152e6)/
+                  (1 + (3851*(-fbar))/1876.0 + (25675*pow(-fbar,2))/16884.0 + (263185*pow(-fbar,3))/540288.0 + (67405*pow(-fbar,4))/1.080576e6 + (55211*pow(-fbar,5))/2.5933824e7);
+    double combined = (-fbar)/8.0 + (21*pow(-fbar,2))/64.0 - (437*pow(-fbar,3))/768.0 + (675*pow(-fbar,4))/1024.0 - (8119*pow(-fbar,5))/12288.0 + (30223*pow(-fbar,6))/49152.0 -
+                      (322703*pow(-fbar,7))/589824.0 + (92891*pow(-fbar,8))/196608.0 - (16961825*pow(-fbar,9))/4.2467328e7 + (4181627*pow(-fbar,10))/1.2582912e7;
+    H_Num = aleph*pow(fbarp, 3) + alpha*pow(fbarp, 2) + beta*fbarp + combined - 2.0*fpp;
+    printf("r: %.3lf fbar' term: %.40lf constant: %.40lf f'' term:%.40lf\n",  r, beta*fbarp, combined, -2.0*fpp);
+    printf("r: %.3lf Hd: %.40lf\n", r, H_Denom);
+  }
+  else
+  {
+    X = pow(2,((double)2.0)/3.0)/(pow(3,((double)1.0)/3.0)*pow(z,((double)1.0)/3.0));
+    double dX_dr = -pow(2,((double)2.0)/3.0)/(3.0*pow(3,((double)1.0)/3.0)*pow(z,((double)4.0)/3.0));
+    double fp = fbarp + 1.0;
+    H_Denom = X * Y * pow(pow(X,2) - pow(fp,2), 1.5);
+    double dX_dt = -dX_dr;
+    double dY_dr = X;
+    double dY_dt = -X;
+    H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2.0*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) - (pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
+  }
+  if(isnan(H_Denom))//If a negative number is under the radical, throw an exception
+  {
+    printf("Error! Cannot Have a Negative Number Raised to the Power 3/2!\n");
+    printf("r= %lf X= %lf\n", r, X);
     return NULL;
   }
-  //double aleph = 2.0 + (-fbar)/2.0 + pow(-fbar,2)/4.0 - (7*pow(-fbar,3))/48.0 + (35*pow(-fbar,4))/384.0 - (91*pow(-fbar,5))/1536.0;
-  double alpha = 11.0 - (9*(-fbar))/4.0 + (21*pow(-fbar,2))/16.0 - (55*pow(-fbar,3))/64.0 + (151*pow(-fbar,4))/256.0 - (425*pow(-fbar,5))/1024.0;
-  double beta = 19.5 - (21*(-fbar))/8.0 + (51*pow(-fbar,2))/32.0 - (137*pow(-fbar,3))/128.0 + (383*pow(-fbar,4))/512.0 -
-                (1093*pow(-fbar,5))/2048.0;
-  double gamma = -0.5 + (5*(-fbar))/8.0 - (5*pow(-fbar,2))/8.0 + (55*pow(-fbar,3))/96.0 - (385*pow(-fbar,4))/768.0 + (1309*pow(-fbar,5))/3072.0 -
-                 (6545*pow(-fbar,6))/18432.0;
-  double delta = 2.0 - (5*(-fbar))/2.0 + (5*pow(-fbar,2))/2.0 - (55*pow(-fbar,3))/24.0 + (385*pow(-fbar,4))/192.0 - (1309*pow(-fbar,5))/768.0 +
-                 (6545*pow(-fbar,6))/4608.0;
-  double epsilon = 0.5 - (3*(-fbar))/8.0 + (9*pow(-fbar,2))/32.0 - (27*pow(-fbar,3))/128.0 + (81*pow(-fbar,4))/512.0 - (243*pow(-fbar,5))/2048.0 +
-                   (729*pow(-fbar,6))/8192.0;
-  double zeta = 2.0 + fbar/2.0 + pow(-fbar,2)/4.0 - (7*pow(-fbar,3))/48.0 + (35*pow(-fbar,4))/384.0 - (91*pow(-fbar,5))/1536.0 +
-                (91*pow(-fbar,6))/2304.0;
-  double eta = -4.0 + 3*(-fbar) - (9*pow(-fbar,2))/4.0 + (27*pow(-fbar,3))/16.0 - (81*pow(-fbar,4))/64.0 + (243*pow(-fbar,5))/256.0 -
-               (729*pow(-fbar,6))/1024.0;
-  H_Num = 2.0*X*pow(fbarp, 3) + alpha*pow(fbarp, 2) + beta*fbarp + gamma + delta + epsilon + zeta + eta - 2.0*fpp;
+  else if(H_Denom == 0.0)//If the denominator = 0, throw an exception
+  {
+    printf("Error! Cannot Divide by 0!\n");
+    printf("r= %lf\n", r);
+    return NULL;
+  }
   H = H_Num / H_Denom;
+  printf("r: %.5lf fbar': %.15lf fbar'': %.15lf\n", r, fbarp, fpp);
   double* H_Ptr = &H;
   return H_Ptr;
 }
 
-/* Function to calculate the numerical values of X, Y, and their first order partial
-derivatives
+/*
+dX_dr = -0.25 - fbar/4.0 - (7*pow(-fbar,2))/32.0 + (35*pow(-fbar,3))/192.0 - (455*pow(-fbar,4))/3072.0 + (91*pow(-fbar,5))/768.0 -
+        (1729*pow(-fbar,6))/18432.0 + (2717*pow(-fbar,7))/36864.0 - (67925*pow(-fbar,8))/1.179648e6 + (475475*pow(-fbar,9))/1.0616832e7 - (2947945*pow(-fbar,10))/8.4934656e7;
+Xbar = fbar/4.0 + pow(-fbar,2)/8.0 - (7*pow(-fbar,3))/96.0 + (35*pow(-fbar,4))/768.0 - (91*pow(-fbar,5))/3072.0 +
+        (91*pow(-fbar,6))/4608.0 - (247*pow(-fbar,7))/18432.0 + (2717*pow(-fbar,8))/294912.0 - (67925*pow(-fbar,9))/((double)1.0616832e7) + (95095*pow(-fbar,10))/((double)2.1233664e7);
+alpha = 5.0 - (3.0*(-fbar))/4.0 + (3*pow(-fbar,2))/16.0 - pow(-fbar,3)/64.0 - (11*pow(-fbar,4))/256.0 + (61*pow(-fbar,5))/1024.0 -
+                       (731*pow(-fbar,6))/12288.0 + (2609*pow(-fbar,7))/49152.0 - (8815*pow(-fbar,8))/196608.0 + (259741*pow(-fbar,9))/7.077888e6 - (833563*pow(-fbar,10))/2.8311552e7;
+beta = 1.5 + (15*(-fbar))/8.0 - (57*pow(-fbar,2))/32.0 + (187*pow(-fbar,3))/128.0 - (589*pow(-fbar,4))/512.0 + (1823*pow(-fbar,5))/2048.0 -
+                                     (16771*pow(-fbar,6))/24576.0 + (51145*pow(-fbar,7))/98304.0 - (155411*pow(-fbar,8))/393216.0 + (4239569*pow(-fbar,9))/1.4155776e7 -
+                                     (12827387*pow(-fbar,10))/5.6623104e7;
+*/
+
+/* Function to calculate the numerical values of X, Y in the Glue and Friedman regions
 
 Paramters: r, t, fp, fpp are the values of r, t, f'(r), and f''(r) from fGenerator(fbar converted to f)
 
 Return: Pointer to a double that stores the value of the mean curvature H
 */
-double* calculateH(double r, double t, double fp, double fpp)
+double* calculateHGF(double r, double t, double fp, double fpp)
 {
     double X, Y, dX_dr, dX_dt, dY_dr, dY_dt;
     static double H;
-    if(r <= 0.8)//Schwarzchild Spacetime M(r) = 1, t0(r) = r, applies for all r <= 0.8
-    {
-      X = pow(2,0.6666666666666666)/(pow(3,0.3333333333333333)*pow(r - t,0.3333333333333333));
-      //printf("X: %lf\n", X);
-      dX_dr = -pow(2,0.6666666666666666)/(3.0*pow(3,0.3333333333333333)*pow(r - t,1.3333333333333333));
-      dX_dt = -dX_dr;
-      Y = 1.6509636244473134*pow(r - t, 2.0/3.0);
-      dY_dr = X;
-      dY_dt = -X;//dY/dt = -dY/dr = -X
-    }
-    else if(r >= 1.2)//Friedman Spacetime M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
+    if(r >= 1.2)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
     {
       X = (pow(3,0.6666666666666666)*pow(r,2)*(1 - t))/(pow(2,0.3333333333333333)*pow(pow(r,6)*(1.0 - t),0.3333333333333333));
       dX_dr = 0.0;
       dX_dt = -((pow(2,0.6666666666666666)*pow(r,2))/(pow(3,0.3333333333333333)*pow(-(pow(r,6)*(-1.0 + t)),0.3333333333333333)));
-      Y = 1.6509636244473134*r*pow(1 - t, 2.0/3);
-      dY_dr = 1.6509636244473134*pow(1 - t, 2.0/3);
+      Y = pow(4.50, 1.0/3.0)*r*pow(1 - t, 2.0/3);
+      dY_dr = pow(4.50, 1.0/3.0)*pow(1 - t, 2.0/3);
       dY_dt = (-1.100642416*r) / pow(1 - t, 1.0/3);
     }
     else//Glue Region M(r) = 4.25r^3 - 7.35r^2 + 3.6r + 0.648, t0(r) = -1.25r^2 + 3r - 0.8, applies for 0.8 < r < 1.2
@@ -243,23 +242,22 @@ double* calculateH(double r, double t, double fp, double fpp)
       dY_dt = (5.847162836584234*(0.15247058823529414 + 0.8470588235294118*r - 1.7294117647058822*pow(r,2) + pow(r,3))*(0.64 - 2.4*r + pow(r,2) + 0.8*t))/
               pow((0.648 + 3.6*r - 7.35*pow(r,2) + 4.25*pow(r,3))*pow(0.8 - 3*r + 1.25*pow(r,2) + t,2),0.6666666666666666);
     }
-    if(fabs(X) < fabs(fp))//If there is a negative number under the radical, throw an exception
+    double H_Denom = X * Y * pow(pow(X,2) - pow(fp,2), 1.5);
+    if(isnan(H_Denom))//If there is a negative number under the radical, throw an exception
     {
         printf("Error! Cannot Have a Negative Number Raised to the Power 3/2!\n");
-        printf("r: %lf f': %lf X: %lf\n", r, fp, X);
+        printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
         return NULL;
     }
-    double H_Denom = X * Y * pow(pow(X,2) - pow(fp,2), 1.5);
-    if(H_Denom == 0.0)//If the denominator = 0, throw an exception
+    else if(H_Denom == 0.0)//If the denominator = 0, throw an exception
     {
         printf("Error! Cannot Divide by 0!\n");
-        printf("r: %lf f': %lf X: %lf\n", r, fp, X);
+        printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
         return NULL;
     }
-    double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2*pow(X,4)*dY_dt) -
-                   (pow(X,2)*((Y*fpp)+(2*fp)*(dY_dr - fp*dY_dt)));
+    double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) -(pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
     H = H_Num / H_Denom;
-    //printf("r: %lf H: %lf\n", r, H);
+    printf("r: %.5lf fbar': %.15lf fbar'': %.15lf\n", r, fp - 1, fpp);
     double* H_ptr = &H;
     return H_ptr;//Return a pointer to the value of H
 }
@@ -331,33 +329,33 @@ static PyObject* calcDerivativesExplicit(PyObject* self, PyObject* args)
   return derivPy;//Return 2-tuple to Python script
 }
 
-/*Function needed to expose the C function calculateHLNr()
+/*Function needed to expose the C function calculateHS()
 
 Python paramters: float variables representing values of r, fbar, fbar'(r), and fbar''(r) = f''(r)
 
 Python return: float representing value of H caluclated using the paramter values
 */
-static PyObject* calcHLNr1(PyObject* self, PyObject* args)
+static PyObject* calcHS1(PyObject* self, PyObject* args)
 {
   double r, fbar, fbarp, fpp;//Value of r, f(r) = t, f'(r), and f''(r) from Python
   if(!PyArg_ParseTuple(args, "dddd", &r, &fbar, &fbarp, &fpp))//If any of the inputs are not doubles, throw an exception
     return NULL;
-  double* H_ptr = calculateHLNr(r, fbar, fbarp, fpp);//Calculate H
+  double* H_ptr = calculateHS(r, fbar, fbarp, fpp);//Calculate H
   return Py_BuildValue("d", *H_ptr);//Return what H_ptr points to
 }
 
-/*Function needed to expose the C function calculateH()
+/*Function needed to expose the C function calculateHGF()
 
 Python paramters: float variables representing values of r, t, f'(r), and f''(r)
 
 Python return: float representing value of H caluclated using the paramter values
 */
-static PyObject* calcH1(PyObject* self, PyObject* args)
+static PyObject* calcHGF1(PyObject* self, PyObject* args)
 {
   double r, t, fp, fpp;//Value of r, f(r) = t, f'(r), and f''(r) from Python
   if(!PyArg_ParseTuple(args, "dddd", &r, &t, &fp, &fpp))//If any of the inputs are not doubles, throw an exception
     return NULL;
-  double* H_ptr = calculateH(r, t, fp, fpp);//Calculate H
+  double* H_ptr = calculateHGF(r, t, fp, fpp);//Calculate H
   return Py_BuildValue("d", *H_ptr);//Return what H_ptr points to
 }
 
@@ -367,8 +365,8 @@ static PyMethodDef fulmineMethods[] = {
       {"eeFbar", fbarExplicitEval, METH_VARARGS, evalFbarExplicit_docstring},//Mapping to explicitEvalFbar()
       {"peCalcDeriv", calcDerivativesPara, METH_VARARGS, derivPara_docstring},//Mapping to evalDerivativesPara()
       {"eeCalcDeriv", calcDerivativesExplicit, METH_VARARGS, derivExplicit_docstring},//Mapping to evalDerivativesExplicit()
-      {"calcHLNr", calcHLNr1, METH_VARARGS, calcHLNr_docstring},//Mapping to calculateHLNr()
-      {"calcH", calcH1, METH_VARARGS, calcH_docstring},//Mapping to calculateH()
+      {"calcHS", calcHS1, METH_VARARGS, calcHS_docstring},//Mapping to calculateHS()
+      {"calcHGF", calcHGF1, METH_VARARGS, calcHGF_docstring},//Mapping to calculateHGF()
       {NULL, NULL, 0, NULL}//Needed for formatting
 };
 
