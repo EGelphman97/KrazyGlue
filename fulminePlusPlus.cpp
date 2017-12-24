@@ -3,14 +3,15 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  November 9, 2017
+  December 23, 2017
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
-  Version 1.0.0
+  Version 1.0.1
 */
 
 #include <iostream>
 #include <vector>
+#include <array>
 #include <cmath>
 using namespace std;
 
@@ -18,28 +19,74 @@ double ALPHA = 0.8;//rho parameters
 double BETA = 1.2;
 double GAMMA = 2.0;
 
+//Function to compute the lambert W-function
+double LambertW(const double z);
+const int dbgW=0;
+
+double LambertW(const double z) {
+  int i;
+  const double eps=4.0e-16, em1=0.3678794411714423215955237701614608;
+  double p,e,t,w;
+  if (dbgW) fprintf(stderr,"LambertW: z=%g\n",z);
+  if (z<-em1 || isinf(z) || isnan(z)) {
+    fprintf(stderr,"LambertW: bad argument %g, exiting.\n",z); exit(1);
+  }
+  if (0.0==z) return 0.0;
+  if (z<-em1+1e-4) { // series near -em1 in sqrt(q)
+    double q=z+em1,r=sqrt(q),q2=q*q,q3=q2*q;
+    return
+     -1.0
+     +2.331643981597124203363536062168*r
+     -1.812187885639363490240191647568*q
+     +1.936631114492359755363277457668*r*q
+     -2.353551201881614516821543561516*q2
+     +3.066858901050631912893148922704*r*q2
+     -4.175335600258177138854984177460*q3
+     +5.858023729874774148815053846119*r*q3
+     -8.401032217523977370984161688514*q3*q;  // error approx 1e-16
+  }
+  /* initial approx for iteration... */
+  if (z<1.0) { /* series near 0 */
+    p=sqrt(2.0*(2.7182818284590452353602874713526625*z+1.0));
+    w=-1.0+p*(1.0+p*(-0.333333333333333333333+p*0.152777777777777777777777));
+  } else
+    w=log(z); /* asymptotic */
+  if (z>3.0) w-=log(w); /* useful? */
+  for (i=0; i<10; i++) { /* Halley iteration */
+    e=exp(w);
+    t=w*e-z;
+    p=w+1.0;
+    t/=e*p-0.5*(p+1.0)*t/p;
+    w-=t;
+    if (fabs(t)<eps*(1.0+fabs(w))) return w; /* rel-abs error */
+  }
+  /* should never get here */
+  fprintf(stderr,"LambertW: No convergence at z=%g, exiting.\n",z);
+  exit(1);
+}
+
 //Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Schwarzschild region
-vector<double> genfS(double z)
+array<double,4> genfS(double z)
 {
-  vector<double> result;
-  result.push_back(z);
-  result.push_back(0.0);//f(z)
-  result.push_back(0.0);//f'(z)
-  result.push_back(0.0);//f''(z)
+  array<double,4> result;
+  result[0] = z;
+  result[1] = 0.0;//f(z)
+  result[2] = 0.0;//f'(z)
+  result[3] = 0.0;//f''(z)
   return result;
 }
 
 //Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Glue Region
-vector<double> genfG(double z)
+array<double,4> genfG(double z)
 {
-  vector<double> result;
+  array<double,4> result;
   return result;
 }
 
 //Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Friedman Region
-vector<double> genfF(double z)
+array<double,4> genfF(double z)
 {
-  vector<double> result;
+  array<double,4> result;
   return result;
 }
 
@@ -48,45 +95,179 @@ vector<double> genfF(double z)
 be needed in Python)*/
 vector<double> fGeneratorPlusPlus()
 {
-  double z = 0.0;
+  double z, rho = 0.0;
   vector<double> result;
-  while(z <= GAMMA)
+  while(rho <= GAMMA)
   {
-    vector<double> tuple4;
-    if(z <= ALPHA)//Schwarzschild region
+    array<double,4> tuple4;
+    if(rho <= ALPHA)//Schwarzschild region
+    {
       tuple4 = genfS(z);
-    else if(z > ALPHA && z < BETA)//Glue region
+    }
+    else if(rho > ALPHA && rho < BETA)//Glue region
+    {
       tuple4 = genfG(z);
-    else if(z >= BETA)//Friedman region
+    }
+    else if(rho >= BETA)//Friedman region
+    {
       tuple4 = genfF(z);
-    result.push_back(tuple4[0]);//Store 4-tuples horizontally
-    result.push_back(tuple4[1]);
-    result.push_back(tuple4[2]);
-    result.push_back(tuple4[3]);
+    }
+    result.push_back(tuple4[0]);//Store 4-tuples horizontally, tuple4[0] corresponds to z
+    result.push_back(tuple4[1]);//w
+    result.push_back(tuple4[2]);//f'(z)
+    result.push_back(tuple4[3]);//f''(z)
   }
   //Output to file
   return result;//Return list of 4-tuples(to Python)
 }
 
-//Function to transform an input 4-tuple (x1, f(x1), f'(x1), f''(x2)) to a 4-tuple (x2, f(x2), f'(x2), f''(x2)) in different Coordinates
-//The variables x1 and x2 represent rho(Tolman-Bondi coordinates) and z(Kruskal coordinates)
-vector<double> transformCoordinates(vector<double> tuple4, char domainCoords, char codomainCoords)
+/*Helper function to tranfrom an input 4-tuple (z, f(z) = w, f'(z), f''(z)) in Kruskal coordinates to
+an output 4-tuple (rho, g(rho) = tau, g'(rho), g''(rho)) in Tolman-Bondi Coordinates*/
+array<double,4> KTBTransform(array<double,4> vals)
 {
+  array<double,4> result;
+  double z = vals[0];
+  double w = vals[1];//f(z)
+  double d1f = vals[2];//f'(z)
+  double d2f = vals[3];//f''(z)
+  U = w - z;//U = w - z
+  V = w + z;//V = w + z
+  t = 2.0*log(-V / U);
+  r = 2.0*LambertW((-U*V) / exp(1)) + 2.0;
+  double tau = 2.0*sqrt(2.0)*sqrt(r) + t - 2.0*log(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
+  double rho = tau + sqrt((2.0/9.0)*pow(r,3));
+  result[0] = rho;
+  result[1] = tau;//g(rho)
+  double r1 = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
+  double test = (sqrt(2.0) + sqrt(r1)) / (sqrt(2.0 - sqrt(r1)));//term in absolute value in expressions for g'(rho), g''(rho)
+  if(test >= 0.0)//Positive domain of absolute value term
+  {
+    //g'(rho)
+    result[2] = (-1.650963624447314*(exp(tau/2.)*(-1.9020315595498223e-16 + 0.27516060407455223*pow(rho,2) + 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) - 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) + 0.40380457618491983*pow(rho - tau,0.6666666666666666) - 0.5503212081491045*rho*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau +
+                0.27516060407455223*pow(tau,2) + d1f*(1.9020315595498223e-16 - 0.27516060407455223*pow(rho,2) - 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) + 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) - 0.40380457618491983*pow(rho - tau,0.6666666666666666) + 0.5503212081491045*rho*tau - 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau -
+                0.27516060407455223*pow(tau,2))) + exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) +
+                4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) - 9.51015779774911e-17*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666)*tau + 0.2751606040745523*pow(tau,2) + d1f*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) +
+                0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) + (-9.510157797749112e-17 + 0.6666666666666667*pow(rho - tau,0.3333333333333333) - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666))*tau +
+                0.2751606040745523*pow(tau,2)))))/(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) - 2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau - 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(-2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau - 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau - 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(-0.6057068642773802 + 1.0000000000000004*pow(rho - tau,0.6666666666666666) +
+                0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 + 1.0000000000000004*pow(rho - tau,0.6666666666666666) + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) + exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) +
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau + (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 -
+                7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))));
+    //g''(rho)
+    result[3] = (-1.650963624447314*d2f*pow(1.100642416298209 - 1.*pow(rho - tau,0.3333333333333333),2)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666))*((0.3668808054327363*exp(tau/2.))/pow(1.100642416298209 -
+                1.*pow(rho - tau,0.3333333333333333),2) - (0.3668808054327363*exp(1.8171205928321397*pow(rho - tau,0.3333333333333333)))/(1.2114137285547597 - 1.*pow(rho - tau,0.6666666666666666)) + (0.3028534321386899*exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 0.9085602964160698*rho +
+                1.*pow(rho - tau,0.6666666666666666) - 0.9085602964160698*tau))/(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666)) + (0.3028534321386899*exp(tau/2.)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 - 0.9085602964160698*rho + 1.*pow(rho - tau,0.6666666666666666) +
+                0.9085602964160698*tau))/((-1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666))) - (1.0000000000000004*(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(pow(rho,2)*(7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333)) -
+                7.850462293418876e-17*pow(rho - tau,0.6666666666666666) + (0.6057068642773801 + 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666))*tau + (7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(-0.6057068642773801 - 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) +
+                1.*pow(rho - tau,0.6666666666666666) + (-1.5700924586837752e-16 + 0.8254818122236567*pow(rho - tau,0.3333333333333333))*tau)) + exp(tau/2.)*(1.5700924586837752e-16 + pow(rho,2)*(-7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333)) + (0.6057068642773801 - 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) -
+                1.*pow(rho - tau,0.6666666666666666))*tau + (-7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(-0.6057068642773801 + 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + (1.5700924586837752e-16 +
+                0.8254818122236567*pow(rho - tau,0.3333333333333333))*tau)))*(exp(tau/2.)*(-1.9020315595498223e-16 + 0.27516060407455223*pow(rho,2) + 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) - 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) + 0.40380457618491983*pow(rho - tau,0.6666666666666666) - 0.5503212081491045*rho*tau +
+                0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau + 0.27516060407455223*pow(tau,2) + d1f*(1.9020315595498223e-16 - 0.27516060407455223*pow(rho,2) - 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) + 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) - 0.40380457618491983*pow(rho - tau,0.6666666666666666) + 0.5503212081491045*rho*tau -
+                0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 0.27516060407455223*pow(tau,2))) + exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 -
+                0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) - 9.51015779774911e-17*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666)*tau + 0.2751606040745523*pow(tau,2) + d1f*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) -
+                9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) + (-9.510157797749112e-17 + 0.6666666666666667*pow(rho - tau,0.3333333333333333) - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666))*tau +
+                0.2751606040745523*pow(tau,2)))))/(pow(1.100642416298209 - 1.*pow(rho - tau,0.3333333333333333),2)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 +
+                1.*pow(rho - tau,0.6666666666666666))*(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) - 2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau -
+                1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau - 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(-2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau - 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau - 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(-0.6057068642773802 +
+                1.0000000000000004*pow(rho - tau,0.6666666666666666) + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 + 1.0000000000000004*pow(rho - tau,0.6666666666666666) + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) + exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau +
+                (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau +
+                d1f*(-0.6057068642773802 - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau +
+                0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau)))))))/(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) - 2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau -
+                1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau - 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(-2.355138688025663e-16*pow(rho - tau,0.6666666666666666) + 0.6057068642773802*tau - 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau - 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(-0.6057068642773802 +
+                1.0000000000000004*pow(rho - tau,0.6666666666666666) + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 + 1.0000000000000004*pow(rho - tau,0.6666666666666666) + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) + exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau +
+                (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau +
+                d1f*(-0.6057068642773802 - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))));
+  }
+  else if(test < 0.0)//Negative domain of absolute value epxression
+  {
+    //g'(rho)
+    result[2] = (1.650963624447314*(exp(tau/2.)*(1.9020315595498223e-16 - 0.27516060407455223*pow(rho,2) - 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) + 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) - 0.40380457618491983*pow(rho - tau,0.6666666666666666) + 0.5503212081491045*rho*tau -
+                0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 0.27516060407455223*pow(tau,2) + d1f*(-1.9020315595498223e-16 + 0.27516060407455223*pow(rho,2) + 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) - 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) + 0.40380457618491983*pow(rho - tau,0.6666666666666666) -
+                0.5503212081491045*rho*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau + 0.27516060407455223*pow(tau,2))) + exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) +
+                rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) - 9.51015779774911e-17*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666)*tau + 0.2751606040745523*pow(tau,2) + d1f*(-1.902031559549822e-16 +
+                0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) + (-9.510157797749112e-17 + 0.6666666666666667*pow(rho - tau,0.3333333333333333) -
+                4.755078898874555e-17*pow(rho - tau,0.6666666666666666))*tau + 0.2751606040745523*pow(tau,2)))))/(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) + 2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau +
+                1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau + 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau + 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau + 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(0.6057068642773802 -
+                1.0000000000000004*pow(rho - tau,0.6666666666666666) - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(0.6057068642773802 - 1.0000000000000004*pow(rho - tau,0.6666666666666666) - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) + exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau +
+                (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau +
+                d1f*(-0.6057068642773802 - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))));
+    //g''(rho)
+    result[3] = (1.650963624447314*d2f*pow(1.100642416298209 - 1.*pow(rho - tau,0.3333333333333333),2)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666))*((-0.3668808054327363*exp(tau/2.))/pow(1.100642416298209 -
+                1.*pow(rho - tau,0.3333333333333333),2) - (0.3668808054327363*exp(1.8171205928321397*pow(rho - tau,0.3333333333333333)))/(1.2114137285547597 - 1.*pow(rho - tau,0.6666666666666666)) + (0.3028534321386899*exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 0.9085602964160698*rho + 1.*pow(rho - tau,0.6666666666666666) -
+                0.9085602964160698*tau))/(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666)) - (0.3028534321386899*exp(tau/2.)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 - 0.9085602964160698*rho + 1.*pow(rho - tau,0.6666666666666666) + 0.9085602964160698*tau))/((-1.100642416298209 +
+                1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666))) - (1.0000000000000004*(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(pow(rho,2)*(-7.850462293418876e-17 + 0.41274090611182834*pow(rho - tau,0.3333333333333333)) + 7.850462293418876e-17*pow(rho - tau,0.6666666666666666) +
+                (-0.6057068642773801 - 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau + (-7.850462293418876e-17 + 0.41274090611182834*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773801 + 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) +
+                (1.5700924586837752e-16 - 0.8254818122236567*pow(rho - tau,0.3333333333333333))*tau)) + exp(tau/2.)*(1.5700924586837752e-16 + pow(rho,2)*(-7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333)) + (0.6057068642773801 - 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666))*tau +
+                (-7.850462293418876e-17 - 0.41274090611182834*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(-0.6057068642773801 + 7.850462293418876e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + (1.5700924586837752e-16 + 0.8254818122236567*pow(rho - tau,0.3333333333333333))*tau)))*(exp(tau/2.)*(1.9020315595498223e-16 -
+                0.27516060407455223*pow(rho,2) - 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) + 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) - 0.40380457618491983*pow(rho - tau,0.6666666666666666) + 0.5503212081491045*rho*tau - 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 0.27516060407455223*pow(tau,2) + d1f*(-1.9020315595498223e-16 +
+                0.27516060407455223*pow(rho,2) + 9.510157797749112e-17*pow(rho - tau,0.3333333333333333) - 0.6666666666666667*rho*pow(rho - tau,0.3333333333333333) + 0.40380457618491983*pow(rho - tau,0.6666666666666666) - 0.5503212081491045*rho*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau + 0.27516060407455223*pow(tau,2))) +
+                exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 - 0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) -
+                9.51015779774911e-17*tau + 0.6666666666666667*pow(rho - tau,0.3333333333333333)*tau - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666)*tau + 0.2751606040745523*pow(tau,2) + d1f*(-1.902031559549822e-16 + 0.2751606040745523*pow(rho,2) - 9.51015779774911e-17*pow(rho - tau,0.3333333333333333) + 0.4038045761849201*pow(rho - tau,0.6666666666666666) + rho*(9.510157797749112e-17 -
+                0.6666666666666667*pow(rho - tau,0.3333333333333333) + 4.755078898874555e-17*pow(rho - tau,0.6666666666666666) - 0.5503212081491046*tau) + (-9.510157797749112e-17 + 0.6666666666666667*pow(rho - tau,0.3333333333333333) - 4.755078898874555e-17*pow(rho - tau,0.6666666666666666))*tau + 0.2751606040745523*pow(tau,2)))))/(pow(1.100642416298209 -
+                1.*pow(rho - tau,0.3333333333333333),2)*(1.100642416298209 + 1.*pow(rho - tau,0.3333333333333333))*(-1.2114137285547597 + 1.*pow(rho - tau,0.6666666666666666))*(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) +
+                2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau + 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau + 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau + 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau +
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(0.6057068642773802 - 1.0000000000000004*pow(rho - tau,0.6666666666666666) - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(0.6057068642773802 - 1.0000000000000004*pow(rho - tau,0.6666666666666666) - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) +
+                exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) -
+                1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau + (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 +
+                7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau +
+                0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau)))))))/(exp(1.8171205928321397*pow(rho - tau,0.3333333333333333))*(0.4127409061118284*(1. + 1.*d1f)*pow(rho,2)*pow(rho - tau,0.3333333333333333) + 2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau + 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau +
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2) + d1f*(2.355138688025663e-16*pow(rho - tau,0.6666666666666666) - 0.6057068642773802*tau + 1.0000000000000004*pow(rho - tau,0.6666666666666666)*tau + 0.4127409061118284*pow(rho - tau,0.3333333333333333)*pow(tau,2)) + rho*(0.6057068642773802 - 1.0000000000000004*pow(rho - tau,0.6666666666666666) -
+                0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(0.6057068642773802 - 1.0000000000000004*pow(rho - tau,0.6666666666666666) - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))) + exp(tau/2.)*(-1.5700924586837754e-16 + pow(rho,2)*(1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 - 0.4127409061118284*pow(rho - tau,0.3333333333333333)) +
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + (-0.6057068642773802 + d1f*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666)) - 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666))*tau + (1.5700924586837754e-16 + d1f*(-1.5700924586837754e-16 -
+                0.4127409061118284*pow(rho - tau,0.3333333333333333)) + 0.4127409061118284*pow(rho - tau,0.3333333333333333))*pow(tau,2) + rho*(0.6057068642773802 + 7.850462293418877e-17*pow(rho - tau,0.3333333333333333) - 1.*pow(rho - tau,0.6666666666666666) - 3.140184917367551e-16*tau - 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau + d1f*(-0.6057068642773802 -
+                7.850462293418877e-17*pow(rho - tau,0.3333333333333333) + 1.*pow(rho - tau,0.6666666666666666) + 3.140184917367551e-16*tau + 0.8254818122236568*pow(rho - tau,0.3333333333333333)*tau))));
+  }
+  return result;
+}
 
-  if(domainCoords == 'T' && codomainCords == 'K')
+array<double,4> TBKTransform(array<double,4>)
+{
+  array<double,4> result;
+  double rho = vals[0];
+  double tau = vals[1];
+  r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
+  double a = r + 2.0*log((r/2.0) - 1);
+  double e_t_4 = exp(-(sqrt(r)/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
+  U = (-exp(a/4.0)) / e_t_4;
+  V = exp(a/4.0) * e_t_4;
+  result[0] = (V - U) / 2.0;//z
+  result[1] = (V + U) / 2.0;//(f(z)) = w
+  return result;
+}
+
+
+/*Function to transform an input ordered pair (x1, f(x1), f'(x1), f''(x1)) to an ordered pair (x2, f(x2), f'(x2), f''(x2)) in different Coordinates
+  The variables x1 and x2 represent rho(Tolman-Bondi coordinates) and z(Kruskal coordinates)*/
+array<double,4> transformCoordinates(array<double,4> vals, char domainCoords, char codomainCoords)
+{
+  static array<double,2> result;
+  double r,t,U,V;
+  if(domainCoords == 'T' && codomainCoords == 'K')//Transform the input ordered pair from Tolman-Bondi coordinates to Kruskal coordinates
   {
-    //Transform the input 4-tuple from Tolman-Bondi coordinates to Kruskal coordinates
+      double rho = vals[0];
+      double tau = vals[1];
+      r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
+      double a = r + 2.0*log((r/2.0) - 1);
+      double e_t_4 = exp(-(sqrt(r)/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
+      U = (-exp(a/4.0)) / e_t_4;
+      V = exp(a/4.0) * e_t_4;
+      result[0] = (V - U) / 2.0;//z
+      result[1] = (V + U) / 2.0;//w
   }
-  else if(domainCoords == 'K' && codomainCords == 'T')
+  else if(domainCoords == 'K' && codomainCoords == 'T')//Transfrom the input ordered pair from Kruskal Coordinates to Tolman-Bondi coordinates
   {
-    //Transfrom the input 4-tuple from Kruskal Coordinates to Tolman-Bondi coordinates
+      result = KTBTransform(vals);
   }
-  else//Invalid coordinate change
+  else//Invalid coordinate change, terminate execution of the program
   {
     cout << "Error! Invalid Coordinates, Only transformations Tolman-Bondi <==> Kruskal are allowed.\n";
-    return NULL;
+    exit(1);
   }
-  return tuple4;
+  return result;
 }
 
 //Function to calculate the mean curvature H(z,w) in the Schwarzschild region
@@ -95,14 +276,8 @@ double calcHS(double z, double f, double fp, double fpp)
   return 0.0;
 }
 
-//Function to calculate the mean curvature H(z,w) in the Glue region
-double calcHG(double z, double f, double fp, double fpp)
-{
-  return 0.0;
-}
-
-//Function to calculate the mean curvature H(z,w) in the Friedman region
-double calcHF(double z, double f, double fp, double fpp)
+//Function to calculate the mean curvature H(z,w) in the Gluing and Friedman region
+double calcHGF(double z, double f, double fp, double fpp)
 {
   return 0.0;
 }
@@ -117,5 +292,39 @@ vector<double> calculateH(vector<double> fData)
 
 int main()
 {
+  array<double,2> tup1;
+  array<double,2> tup2;
+  array<double,2> tup3;
+  array<double,2> tup1r;
+  array<double,2> tup2r;
+  array<double,2> tup3r;
+  array<double,4> data1 = {1.5, -37.0/30.0, 0.0, 0.0};
+  array<double,4> data2 = {1.6, -37.0/30.0, 0.0, 0.0};
+  array<double,4> data3 = {1.212779, -37.0/30.0, 0.0, 0.0};
+  tup1 = transformCoordinates(data1, 'T', 'K');
+  printf("z: %lf w: %lf\n", tup1[0], tup1[1]);
+  array<double,4> tup1b = {tup1[0], tup1[1], 0.0, 0.0};
+  tup1r = transformCoordinates(tup1b, 'K', 'T');
+  printf("rho: %lf tau: %lf\n", tup1r[0], tup1r[1]);
+  tup2 = transformCoordinates(data2, 'T', 'K');
+  printf("z: %lf w: %lf\n", tup2[0], tup2[1]);
+  array<double,4> tup2b = {tup2[0], tup2[1], 0.0, 0.0};
+  tup2r = transformCoordinates(tup2b, 'K', 'T');
+  printf("rho: %lf rho: %lf\n", tup2r[0], tup2r[1]);
+  tup3 = transformCoordinates(data3, 'T', 'K');
+  array<double,4> tup3b = {tup3[0], tup3[1], 0.0, 0.0};
+  tup3r = transformCoordinates(tup3b, 'K', 'T');
+  int i;
+  double EPSILON = 1e-14;
+  for(i = 0; i < 1; i++)
+  {
+    if(fabs(data1[i] - tup1r[i]) > EPSILON || fabs(data2[i] - tup2r[i]) > EPSILON || fabs(data3[i] - tup3r[i]) > EPSILON)
+    {
+        printf("error: %.17lf\n", fabs(data1[i] - tup1r[i]));
+        printf("Test Failed!!!!!\n");
+        exit(1);
+    }
+  }
+  printf("Test Successful!!!!!\n");
   return 0;
 }
