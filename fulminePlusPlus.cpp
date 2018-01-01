@@ -6,12 +6,11 @@
   December 31, 2017
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
-  Version 1.0.1
+  Version 1.1.0
 */
 
-#ifdef __cplusplus
-#include <Python.h>//Header file needed to interface with Python
-#include <stdio.h>
+//#include <Python.h>//Header file needed to interface with Python
+#include <iostream>
 #include <vector>//std::vector
 #include <array>//std::array
 #include <cmath>
@@ -327,6 +326,7 @@ vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 
 /*Function to convert a vector of stl arrays of size 4 to a single array,
 with the first index storing the size of the array*/
+/*
 double* vectorToArray(vector< array<double,4> > fVals)
 {
   double arr[4*fVals.size() + 1];//First index stores
@@ -342,11 +342,11 @@ double* vectorToArray(vector< array<double,4> > fVals)
     }
   }
   return arr;
-}
+}*/
 
 /*Function to generate an array of doubles representing values of z, w, and the first and second derivatives.
 The firstEach set of 4 indices i, i+1, i+2, i+3represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
-double* fGeneratorPlusPlus(double step_size, int nPoints)
+vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
 {
   vector< array<double,4> > result;
   double a = 0.80360287983844092;//corresponding z-value for rho = ALPHA
@@ -362,101 +362,136 @@ double* fGeneratorPlusPlus(double step_size, int nPoints)
   {
     result.push_back(fGlueS[i]);
   }
-  double* arr = vectorToArray(result);//Convert 4-tuples to array so it can be compiled using a C compiler
-  return arr;//Return array
+  //double* arr = vectorToArray(result);//Convert 4-tuples to array so it can be compiled using a C compiler
+  return result;//Return array
 }
 
-/*Function needed to expose the C++ function fGenerator()
-Python parameters: float z_step representing step size for z,  int nPoints representing
-number of rho values from which to generate z-values
-Python return: array of tuples of size 4 of form (z, f(z) = w, f'(z), f''(z))
-*/
-static PyObject* fGenBuild(PyObject* self, PyObject* args)
-{
-  double z_step;
-  int nPoints;
-  if(!PyArg_ParseTuple(args, "di", &z_step, &nPoints))//If x is not a double, throw an exception
-    return NULL;
-  double* arr = fGeneratorPlusPlus(z_step, nPoints);//Perform numerical evaluation to obtain 4-tuple (z, f(z) = w, f'(z), f''(z))
-  const unsigned tupleLength = 4;//Length of tuple, in terms of memory
-  const unsigned arrayLength  = unsigned(arr[0]);//Length of array
-  double* arr
-  PyObject* list = PyListNew(0);//List of 4-tuples to be returned
-  unsigned i;
-  for(i = 0; i < arrayLength; i++)
-  {
-    PyObject* tuple = PyTupleNew(tupleLength);//Initialize tuple
-    int j;
-    for(j = 0; j < tupleLength; j++)
-    {
-      PyObject* val = PyFloatNew(arr[(4*i) + j])//Build array
-      PyTuple_SET_ITEM(tuple, j, val)//Insert value into tuple
-    }
-    PyList_SET_ITEM(list, i, tuple)//Insert tuple into array
-  }
-  return list;
-}
 
-static char module_docstring[] =
-    "fulminePlusPlus, a C++ module to perform numerical evaluation and differentiation for KG2";
-static char evalFbarPara_docstring[] =
-    "function to generate list of 4-tuples (z, f(z) = w, f'(z), f''(z)";
-
-//Mapping of the names of Python methods to C functions
-static PyMethodDef fulminePlusPlusMethods[] = {
-      {"fGenerator5", fGenBuild, METH_VARARGS, fGenerator_docstring},//Mapping to fGeneratorPlusPlus()
-      {NULL, NULL, 0, NULL}//Null terminator needed for formatting
-};
-
-//Module definition structure
-static struct PyModuleDef fulminePlusPlusModule = {
-    PyModuleDef_HEAD_INIT,
-    "fulminePlusPlus",     //Name of module
-    module_docstring,      //Documentation
-    -1,
-    fulminePlusPlusMethods
-};
-
-extern "C" {
-#endif
-//Function to initialize the module
-PyMODINIT_FUNC PyInit_fulmine(void)
-{
-    return PyModule_Create(&fulminePlusPlusModule);
-}
-#ifdef __cplusplus
-}
-#endif
-/*
 //Function to calculate the mean curvature H(z,w) in the Schwarzschild region
-double calcHS(double z, double f, double fp, double fpp)
+double calcHS(array<double,4> fVals)
 {
-  return 0.0;
+  double z = fVals[0];
+  double f = fVals[1];
+  double fp = fVals[2];
+  double fpp = fVals[3];
+  double r = 2.0*LambertW(((z*z) - (f*f)) / exp(1)) + 2.0;
+  double H_Num = exp(r/4.0)*(((r-6.0)*(1.0 - (fp*fp))*(exp(-r/2.0)/(r-1))*(fp*z - f)) + r*fpp);
+  double H_Denom = 4*sqrt(2.0)*pow(1.0 - (fp*fp), 3.0/2.0)*sqrt(r);
+  double H = H_Num / H_Denom;
+  return H;
 }
 
-//Function to calculate the mean curvature H(z,w) in the Gluing and Friedman region
-double calcHGF(double z, double f, double fp, double fpp)
+/*Function to calculate the mean curvature H in the Gluing and Friedman region from
+  4-tuple (z, f(z) = w, f'(z), f''(z)) represented by kCoords*/
+double calcHGF(array<double,4> kCoords)
 {
-  return 0.0;
+  array<double,4> tbCoords = KTBTransform(kCoords);
+  double r = tbCoords[0];
+  double t = tbCoords[1];
+  double fp = tbCoords[2];
+  double fpp = tbCoords[3];
+  double X, Y, dX_dr, dX_dt, dY_dr, dY_dt;
+  static double H;
+  if(r >= 1.2)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 0.5
+  {
+    X = (pow(3,0.6666666666666666)*pow(r,2)*(1 - t))/(pow(2,0.3333333333333333)*pow(pow(r,6)*(1.0 - t),0.3333333333333333));
+    dX_dr = 0.0;
+    dX_dt = -((pow(2,0.6666666666666666)*pow(r,2))/(pow(3,0.3333333333333333)*pow(-(pow(r,6)*(-1.0 + t)),0.3333333333333333)));
+    Y = pow(4.50, 1.0/3.0)*r*pow(1 - t, 2.0/3);
+    dY_dr = pow(4.50, 1.0/3.0)*pow(1 - t, 2.0/3);
+    dY_dt = (-1.100642416*r) / pow(1 - t, 1.0/3);
+  }
+  else//Glue Region applies for 0.1 < r < 0.5
+  {
+    X = (2*(-27 + 90*r - 93.75*pow(r,2) + 31.25*pow(r,3))*(1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5)) +
+        (-21.6 + 176.4*r - 414.75*pow(r,2) + 378.75*pow(r,3) - 117.1875*pow(r,4))*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t))/
+        (pow(6,0.3333333333333333)*pow(pow(1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) -
+        23.4375*pow(r,5),2)*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t),0.3333333333333333));
+    double dX_dr_Num = 1.402168623996777 + 3.666382459143577e6*pow(r,18) - 684462.0742918561*pow(r,19) + 79767.01691360433*pow(r,20) - 4366.562320519018*pow(r,21) +
+            pow(r,14)*(1.3939247798328805e8 - 278787.1283822919*t) + pow(r,16)*(3.829358379162845e7 - 10540.714840585912*t) - 0.19774845563650464*t - 0.008593825839646838*pow(t,2) +
+            pow(r,17)*(-1.3742637198641371e7 + 739.4941234503592*t) + pow(r,15)*(-8.225734141495614e7 + 69305.14160522398*t) + pow(r,7)*(-1.3930824322660064e7 + 778518.5670809123*t -
+            1382.8832281183295*pow(t,2)) + pow(r,9)*(-7.82507496515977e7 + 2.260651898757414e6*t - 1334.9178234153358*pow(t,2)) +
+            pow(r,5)*(-939034.6828495631 + 86523.32391806085*t - 310.6557815252211*pow(t,2)) + pow(r,11)*(-1.8453572308964357e8 + 2.280388111738583e6*t - 270.5349708796563*pow(t,2)) +
+            pow(r,3)*(-19222.543408078545 + 2497.581547038366*t - 8.752185508049237*pow(t,2)) + pow(r,13)*(-1.89129868163097e8 + 767132.6185375242*t - 5.503212081491041*pow(t,2)) +
+            pow(r,2)*(1533.3627901175862 - 221.0799598868958*t - 0.059731696412250714*pow(t,2)) + r*(-70.92671275275359 + 10.645535348763083*t + 0.12584713841830317*pow(t,2)) +
+            pow(r,12)*(2.073436365106003e8 - 1.529129577650688e6*t + 57.805739703981956*pow(t,2)) + pow(r,4)*(159294.30723341077 - 17788.78507195431*t + 73.94049325029711*pow(t,2)) +
+            pow(r,10)*(1.3346535376715788e8 - 2.590495693345052e6*t + 744.2856542753781*pow(t,2)) + pow(r,6)*(4.1248685011178674e6 - 301727.5974644786*t + 804.0799110682765*pow(t,2)) +
+            pow(r,8)*(3.696740152888469e7 - 1.5170766111478277e6*t + 1633.0799177990832*pow(t,2));
+    double dX_dr_Denom = (pow(0.064512 - 0.9216000000000001*r + 3.7632000000000003*pow(r,2) - 5.898666666666666*pow(r,3) + 4.04*pow(r,4) - pow(r,5),2)*pow(pow(1.512 - 21.6*r + 88.2*pow(r,2) -
+                         138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5),2)*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t),0.3333333333333333)*(0.8192 -
+                         3.456*r + 5.76*pow(r,2) - 4.0*pow(r,3) + pow(r,4) - 0.128*t));
+    dX_dr = dX_dr_Num / dX_dr_Denom;
+    dX_dt = (445.4140078080003 - 1.1174983978271486e8*pow(r,15) + 2.4200284481048584e7*pow(r,16) - 3.2347440719604488e6*pow(r,17) + 201165.67611694336*pow(r,18) + pow(r,8)*(1.2458457605343757e9 - 6.6827533453125e7*t) +
+            pow(r,10)*(2.189734626064453e9 - 4.5997873388671875e7*t) + pow(r,6)*(2.6377120935000014e8 - 2.6682266362500004e7*t) + pow(r,12)*(1.4780344404907227e9 - 7.438005065917969e6*t) + pow(r,4)*(1.8044774044200003e7 - 2.756455191e6*t) +
+            pow(r,14)*(3.5647639389038086e8 - 128746.03271484375*t) + pow(r,2)*(290505.19363200024 - 56618.245728000016*t) - 98.76142080000005*t + r*(-17265.847818240014 + 3628.3064832000014*t) +
+            pow(r,3)*(-2.8311145168320006e6 + 497276.32752000005*t) + pow(r,13)*(-8.3333009765625e8 + 1.4563751220703125e6*t) + pow(r,5)*(-8.059053482640001e7 + 1.0264048002e7*t) + pow(r,11)*(-2.0313835853027346e9 + 2.2681193115234375e7*t) +
+            pow(r,7)*(-6.524829870975003e8 + 4.960860266250001e7*t) + pow(r,9)*(-1.8609794385e9 + 6.5376476953125e7*t))/(3.0*pow(6,0.3333333333333333)*pow(pow(1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) -
+            23.4375*pow(r,5),2)*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t),1.3333333333333333));
+    Y = 1.6509636244473134*pow((1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5))*pow(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) +
+        7.8125*pow(r,4) - t,2),0.3333333333333333);
+    dY_dr = (-10234.130438716447*(0.8192 - 3.456*r + 5.76*pow(r,2) - 4.0*pow(r,3) + pow(r,4) - 0.128*t)*(0.09237551261538461 - 35.41070769230769*pow(r,5) + 21.409641025641026*pow(r,6) - 7.113846153846154*pow(r,7) + pow(r,8) +
+            pow(r,2)*(7.27764676923077 - 0.17423753846153847*t) + pow(r,4)*(34.955421538461536 - 0.04923076923076923*t) + r*(-1.323625550769231 + 0.07410609230769231*t) + pow(r,3)*(-20.888024615384616 + 0.15911384615384616*t) -
+            0.009074215384615385*t))/pow((1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5))*pow(-6.4 + 27*r - 45*pow(r,2) + 31.25*pow(r,3) -
+            7.8125*pow(r,4) + t,2),0.6666666666666666);
+    dY_dt = (201.53364556241618*(-0.064512 + 0.9216000000000001*r - 3.7632000000000003*pow(r,2) + 5.898666666666666*pow(r,3) - 4.04*pow(r,4) + pow(r,5))*(0.8192 - 3.456*r + 5.76*pow(r,2) - 4.0*pow(r,3) + pow(r,4) - 0.128*t))/
+            pow((1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5))*pow(-6.4 + 27*r - 45*pow(r,2) + 31.25*pow(r,3) -
+            7.8125*pow(r,4) + t,2),0.6666666666666666);
+  }
+  double H_Denom = X * Y * pow(pow(X,2) - pow(fp,2), 1.5);
+  if(isnan(H_Denom))//If there is a negative number under the radical, throw an exception
+  {
+      printf("Error! Cannot Have a Negative Number Raised to the Power 3/2!\n");
+      printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
+      exit(1);
+      //return NULL;
+  }
+  else if(H_Denom == 0.0)//If the denominator = 0, throw an exception
+  {
+      printf("Error! Cannot Divide by 0!\n");
+      printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
+      exit(1);
+      //return NULL;
+  }
+  double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) -(pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
+  H = H_Num / H_Denom;
+  return H;
 }
 
-//Function to calculate the mean curvature H for all three regions
-//Returns a vector that stores the values of H as well as their corresponding z-values
-vector<double> calculateH(vector<double> fData)
+/*Function to calculate the mean curvature H for all three regions
+Returns a vector that stores the values of H as well as their corresponding z-values
+The ordered pair (z, H) is represented by an array of size 2*/
+vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
 {
-  vector<double> h_zValues;
-  return h_zValues;
+  vector< array<double,2> > hValues;
+  int i;
+  double H;
+  for(i = 0; i < fVals.size(); i++)
+  {
+    array<double,4> element = fVals[i];
+    double z = element[0];
+    if(z < 0.80360287983844092)//Schwarzschild region
+    {
+      H = calcHS(element);
+    }
+    else//Glue and Friedman Regions
+    {
+      H = calcHGF(element);
+    }
+    array<double,2> nElem = {element[0], H};//Build ordered pair
+    hValues.push_back(nElem);//Append ordered pair to vector
+  }
+  return hValues;
 }
 
 int main()
 {
+  /*
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
   int i;
   for(i = 0; i < fGen.size(); i++)
   {
     array<double, 4> element = fGen[i];
     printf("{%lf,%lf}, ", element[0], element[1]);
-  }
+  }*/
   return 0;
 }
-*/
