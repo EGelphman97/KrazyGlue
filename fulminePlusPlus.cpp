@@ -3,26 +3,28 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  December 23, 2017
+  December 31, 2017
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
   Version 1.0.1
 */
 
-#include <iostream>
-#include <vector>
-#include <array>
+#ifdef __cplusplus
+#include <Python.h>//Header file needed to interface with Python
+#include <stdio.h>
+#include <vector>//std::vector
+#include <array>//std::array
 #include <cmath>
 using namespace std;
 
-double ALPHA = 0.8;//rho parameters
-double BETA = 1.2;
+double ALPHA = 0.1;//rho parameters
+double BETA = 0.5;
 double GAMMA = 2.0;
+double EPSILON = 1.0e-15;//Slightly better than machine precision
 
 //Function to compute the lambert W-function
 double LambertW(const double z);
 const int dbgW=0;
-
 double LambertW(const double z) {
   int i;
   const double eps=4.0e-16, em1=0.3678794411714423215955237701614608;
@@ -65,62 +67,6 @@ double LambertW(const double z) {
   exit(1);
 }
 
-//Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Schwarzschild region
-array<double,4> genfS(double z)
-{
-  array<double,4> result;
-  result[0] = z;
-  result[1] = 0.0;//f(z)
-  result[2] = 0.0;//f'(z)
-  result[3] = 0.0;//f''(z)
-  return result;
-}
-
-//Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Glue Region
-array<double,4> genfG(double z)
-{
-  array<double,4> result;
-  return result;
-}
-
-//Function to generate the 4-tuple (z, f(z) = w, f'(z), f''(z)) in the Friedman Region
-array<double,4> genfF(double z)
-{
-  array<double,4> result;
-  return result;
-}
-
-/*Function to generate a vector of 4-tuples (z, f(z) = w, f'(z), f''(z)) for allocate
-3 regions. The 4-tuples are stored horizontally in the vector(some modulus operations are going to
-be needed in Python)*/
-vector<double> fGeneratorPlusPlus()
-{
-  double z, rho = 0.0;
-  vector<double> result;
-  while(rho <= GAMMA)
-  {
-    array<double,4> tuple4;
-    if(rho <= ALPHA)//Schwarzschild region
-    {
-      tuple4 = genfS(z);
-    }
-    else if(rho > ALPHA && rho < BETA)//Glue region
-    {
-      tuple4 = genfG(z);
-    }
-    else if(rho >= BETA)//Friedman region
-    {
-      tuple4 = genfF(z);
-    }
-    result.push_back(tuple4[0]);//Store 4-tuples horizontally, tuple4[0] corresponds to z
-    result.push_back(tuple4[1]);//w
-    result.push_back(tuple4[2]);//f'(z)
-    result.push_back(tuple4[3]);//f''(z)
-  }
-  //Output to file
-  return result;//Return list of 4-tuples(to Python)
-}
-
 /*Helper function to tranfrom an input 4-tuple (z, f(z) = w, f'(z), f''(z)) in Kruskal coordinates to
 an output 4-tuple (rho, g(rho) = tau, g'(rho), g''(rho)) in Tolman-Bondi Coordinates*/
 array<double,4> KTBTransform(array<double,4> vals)
@@ -130,10 +76,10 @@ array<double,4> KTBTransform(array<double,4> vals)
   double w = vals[1];//f(z)
   double d1f = vals[2];//f'(z)
   double d2f = vals[3];//f''(z)
-  U = w - z;//U = w - z
-  V = w + z;//V = w + z
-  t = 2.0*log(-V / U);
-  r = 2.0*LambertW((-U*V) / exp(1)) + 2.0;
+  double U = w - z;//U = w - z
+  double V = w + z;//V = w + z
+  double t = 2.0*log(-V / U);
+  double r = 2.0*LambertW((-U*V) / exp(1)) + 2.0;
   double tau = 2.0*sqrt(2.0)*sqrt(r) + t - 2.0*log(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
   double rho = tau + sqrt((2.0/9.0)*pow(r,3));
   result[0] = rho;
@@ -224,52 +170,264 @@ array<double,4> KTBTransform(array<double,4> vals)
   return result;
 }
 
-array<double,4> TBKTransform(array<double,4>)
+//Recursive helper function for binarySearch()
+array<double,2> binSearch(int low, int high, vector< array<double,2> > vals, double key)
 {
-  array<double,4> result;
-  double rho = vals[0];
-  double tau = vals[1];
-  r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
-  double a = r + 2.0*log((r/2.0) - 1);
-  double e_t_4 = exp(-(sqrt(r)/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
-  U = (-exp(a/4.0)) / e_t_4;
-  V = exp(a/4.0) * e_t_4;
-  result[0] = (V - U) / 2.0;//z
-  result[1] = (V + U) / 2.0;//(f(z)) = w
+  if(low > high)//Exact Match not found, return indices for linear interpolation
+  {
+    int idx1, idx2;
+    if(low == high)
+    {
+      idx1 = high;
+      idx2 = high + 1;
+    }
+    else//low > high
+    {
+      idx1 = high;
+      idx2 = low;
+    }
+    array<double,2> result = {idx1, idx2};
+    return result;
+  }
+  int mid = (high + low) / 2;
+  if(key < vals[mid][0])//key < value at mid
+    return binSearch(low, mid - 1, vals, key);
+  else if(fabs(key - vals[mid][0]) < EPSILON)//Exact Match
+  {
+    array<double,2> result = {mid, mid};//Average of two equal numbers is that number
+    return result;
+  }
+  else//key > value at mid
+    return binSearch(mid + 1, high, vals, key);
+}
+
+/*Function to do the binary search, where key is some z value
+If key is found, return array of size two, with both indices having the index where key is found
+If key is not found, return array of size 2 <id1, id2> , from which to construct a linear approximation*/
+array<double,2> binarySearch(vector< array<double,2> > vals, double key)
+{
+  array<double,2> result;
+  result = binSearch(0, vals.size() - 1, vals, key);
+  return result;
+}
+/*Function to search through the vector vals to determine a value for f(z) = w at
+the z-value z = target via a linear interpolation of the values for w at the two z-Values
+closest to z0
+*/
+double interpolate(double key, vector< array<double,2> > vals)
+{
+  double val;
+  if(key > vals[vals.size() - 1][0])//Special case
+    val = vals[vals.size() - 1][1];
+  else
+  {
+    array<double,2> indices = binarySearch(vals, key);
+    val = (vals[indices[0]][1] + vals[indices[1]][1]) / 2.0;
+  }
+  return val;//Return average of w-values at the two indices in vals
+}
+
+/*Function to generate a vector of ordered pairs(implemented as arrays of size 2) (z, w)
+with an even z-step given by the value of the variable z_step. Variable nPoints
+is needed for the initial generation of rho-values*/
+vector< array<double,2> > getConstZStep(double z_step, int nPoints)
+{
+  vector< array<double,2> > result;
+  //Generate values of rho and tau for ALPHA < rho <= GAMMA
+  double rho_step = (GAMMA - ALPHA) / (double)nPoints;
+  double rho = ALPHA;
+  double tau;
+  vector< array<double,2> > zw;
+  int i;
+  for(i = 0; i < nPoints; i++)//Iterate based on list index i, increment rho seperately
+  {
+    if(rho < BETA)//Glue region
+      tau = -1.84115*pow(rho,3) + 0.720532*pow(rho,2) + 0.6651*rho - 1.713532;
+    else//Friedman region
+      tau = -(double)37.0 / 30.0;
+    double r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
+    double sqr = sqrt(r);
+    double a = r + 2.0*log((r/2.0) - 1);
+    double e_t_4 = exp(-(sqr/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqr)/(sqrt(2.0) - sqr)));
+    double U = (-exp(a/4.0)) / e_t_4;
+    double V = exp(a/4.0) * e_t_4;
+    array<double,2> element = {(V - U) / 2.0, (V + U) / 2.0};// (z, f(z) = w)
+    zw.push_back(element);//Append array to vector
+    rho += rho_step;
+  }
+  double z = zw[0][0];
+  for(i = 0; i < nPoints; i++)//Iterate based on index in vector
+  {
+    array<double,2> element;
+    if(i == 0)//First element is special case
+    {
+      element[0] = z;
+      element[1] = zw[0][1];//Corresponding w value for z0 = zw[0][0]
+      result.push_back(element);//z, element at index 0 in zw
+    }
+    else//General case
+    {
+      double w = interpolate(z, zw);
+      element[0] = z;
+      element[1] = w;
+      result.push_back(element);
+    }
+    z += z_step;
+  }
+  int j = result.size() - 1;
+  while(fabs(result[j][1] - result[j - 1][1]) <= EPSILON)//Trim end
+  {
+      result.pop_back();
+      j--;
+  }
   return result;
 }
 
-
-/*Function to transform an input ordered pair (x1, f(x1), f'(x1), f''(x1)) to an ordered pair (x2, f(x2), f'(x2), f''(x2)) in different Coordinates
-  The variables x1 and x2 represent rho(Tolman-Bondi coordinates) and z(Kruskal coordinates)*/
-array<double,4> transformCoordinates(array<double,4> vals, char domainCoords, char codomainCoords)
+/*Function to compute the transfromation T: (rho, g(rho) = tau, g'(rho), g''(rho)) |--> (z, f(z) = w, f'(z), f''(z))
+Returns a vector of arrays of size 4, with the array of size 4 representing the 4-tuple (z, f(z) = w, f'(z), f''(z))*/
+vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 {
-  static array<double,2> result;
-  double r,t,U,V;
-  if(domainCoords == 'T' && codomainCoords == 'K')//Transform the input ordered pair from Tolman-Bondi coordinates to Kruskal coordinates
+  vector< array<double,2> > constZStep = getConstZStep(z_step, nPoints);
+  vector< array<double,4> > result;
+  int i;
+  double h = (constZStep[constZStep.size() - 1][0] - constZStep[0][0]) / 2.0;
+  for(i = 0; i < constZStep.size(); i++)
   {
-      double rho = vals[0];
-      double tau = vals[1];
-      r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
-      double a = r + 2.0*log((r/2.0) - 1);
-      double e_t_4 = exp(-(sqrt(r)/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
-      U = (-exp(a/4.0)) / e_t_4;
-      V = exp(a/4.0) * e_t_4;
-      result[0] = (V - U) / 2.0;//z
-      result[1] = (V + U) / 2.0;//w
-  }
-  else if(domainCoords == 'K' && codomainCoords == 'T')//Transfrom the input ordered pair from Kruskal Coordinates to Tolman-Bondi coordinates
-  {
-      result = KTBTransform(vals);
-  }
-  else//Invalid coordinate change, terminate execution of the program
-  {
-    cout << "Error! Invalid Coordinates, Only transformations Tolman-Bondi <==> Kruskal are allowed.\n";
-    exit(1);
+    array<double,4> element;
+    double z = constZStep[i][0];
+    double w = constZStep[i][1];
+    double fp, fpp;//f'(z), f''(z)
+    if(i == 0)//First endpoint
+    {
+      fp = (-3.0*w + 4.0*constZStep[i + 1][1] - constZStep[i + 2][1]) / (2.0*h);//3 - point endpoint
+      double fpplus1 = (constZStep[i + 2][1] - w) / (2.0*h);
+      double fpplus2 = (constZStep[i + 3][1] - constZStep[i + 1][1]) / (2.0*h);
+      fpp = (-3.0*fp + 4.0*fpplus1 - fpplus2) / (2.0*h);//Compute f'' in similar manner to f'
+    }
+    else if(i == constZStep.size() - 1)//Last endpoint
+    {
+      fp = (-3.0*w + 4.0*constZStep[i - 1][1] - constZStep[i - 2][1]) / (2.0*h);//3 - point endpoint
+      double fpminus1 = (w - constZStep[i - 2][1]) / (2.0*h);
+      double fpminus2 = (constZStep[i - 3][1] - constZStep[i - 1][1]) / (2.0*h);
+      fpp = (-3.0*fp + 4.0*fpminus1 - fpminus2) / (2.0*h);//Compute f'' in similar manner to f'
+    }
+    else//Use 3-point midpoint formulas
+    {
+      fp = (constZStep[i + 1][1] - constZStep[i - 1][1]) / (2.0*h);
+      fpp = (constZStep[i - 1][1] - 2.0*w + constZStep[i + 1][1]) / (h*h);
+    }
+    element[0] = z;
+    element[1] = w;
+    element[2] = fp;
+    element[3] = fpp;
+    result.push_back(element);
   }
   return result;
 }
 
+/*Function to convert a vector of stl arrays of size 4 to a single array,
+with the first index storing the size of the array*/
+double* vectorToArray(vector< array<double,4> > fVals)
+{
+  double arr[4*fVals.size() + 1];//First index stores
+  int i,j,k;
+  arr[0] = arr[4*fVals.size()];
+  k = 1;
+  for(i = 0; i < 4*fVals.size(); i++)
+  {
+    for(j = 0; j < 4; j++)
+    {
+      arr[k] = fVals[i][j];
+      k++;
+    }
+  }
+  return arr;
+}
+
+/*Function to generate an array of doubles representing values of z, w, and the first and second derivatives.
+The firstEach set of 4 indices i, i+1, i+2, i+3represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
+double* fGeneratorPlusPlus(double step_size, int nPoints)
+{
+  vector< array<double,4> > result;
+  double a = 0.80360287983844092;//corresponding z-value for rho = ALPHA
+  double z;
+  for(z = 0.0; z <= a; z += step_size)
+  {
+      array<double, 4> element = {z, 0.0, 0.0, 0.0};
+      result.push_back(element);
+  }
+  vector< array<double,4> > fGlueS = TBKTransform(step_size, nPoints);
+  int i;
+  for(i = 0; i < fGlueS.size(); i++)//Append contents of fGlueS to result
+  {
+    result.push_back(fGlueS[i]);
+  }
+  double* arr = vectorToArray(result);//Convert 4-tuples to array so it can be compiled using a C compiler
+  return arr;//Return array
+}
+
+/*Function needed to expose the C++ function fGenerator()
+Python parameters: float z_step representing step size for z,  int nPoints representing
+number of rho values from which to generate z-values
+Python return: array of tuples of size 4 of form (z, f(z) = w, f'(z), f''(z))
+*/
+static PyObject* fGenBuild(PyObject* self, PyObject* args)
+{
+  double z_step;
+  int nPoints;
+  if(!PyArg_ParseTuple(args, "di", &z_step, &nPoints))//If x is not a double, throw an exception
+    return NULL;
+  double* arr = fGeneratorPlusPlus(z_step, nPoints);//Perform numerical evaluation to obtain 4-tuple (z, f(z) = w, f'(z), f''(z))
+  const unsigned tupleLength = 4;//Length of tuple, in terms of memory
+  const unsigned arrayLength  = unsigned(arr[0]);//Length of array
+  double* arr
+  PyObject* list = PyListNew(0);//List of 4-tuples to be returned
+  unsigned i;
+  for(i = 0; i < arrayLength; i++)
+  {
+    PyObject* tuple = PyTupleNew(tupleLength);//Initialize tuple
+    int j;
+    for(j = 0; j < tupleLength; j++)
+    {
+      PyObject* val = PyFloatNew(arr[(4*i) + j])//Build array
+      PyTuple_SET_ITEM(tuple, j, val)//Insert value into tuple
+    }
+    PyList_SET_ITEM(list, i, tuple)//Insert tuple into array
+  }
+  return list;
+}
+
+static char module_docstring[] =
+    "fulminePlusPlus, a C++ module to perform numerical evaluation and differentiation for KG2";
+static char evalFbarPara_docstring[] =
+    "function to generate list of 4-tuples (z, f(z) = w, f'(z), f''(z)";
+
+//Mapping of the names of Python methods to C functions
+static PyMethodDef fulminePlusPlusMethods[] = {
+      {"fGenerator5", fGenBuild, METH_VARARGS, fGenerator_docstring},//Mapping to fGeneratorPlusPlus()
+      {NULL, NULL, 0, NULL}//Null terminator needed for formatting
+};
+
+//Module definition structure
+static struct PyModuleDef fulminePlusPlusModule = {
+    PyModuleDef_HEAD_INIT,
+    "fulminePlusPlus",     //Name of module
+    module_docstring,      //Documentation
+    -1,
+    fulminePlusPlusMethods
+};
+
+extern "C" {
+#endif
+//Function to initialize the module
+PyMODINIT_FUNC PyInit_fulmine(void)
+{
+    return PyModule_Create(&fulminePlusPlusModule);
+}
+#ifdef __cplusplus
+}
+#endif
+/*
 //Function to calculate the mean curvature H(z,w) in the Schwarzschild region
 double calcHS(double z, double f, double fp, double fpp)
 {
@@ -292,39 +450,13 @@ vector<double> calculateH(vector<double> fData)
 
 int main()
 {
-  array<double,2> tup1;
-  array<double,2> tup2;
-  array<double,2> tup3;
-  array<double,2> tup1r;
-  array<double,2> tup2r;
-  array<double,2> tup3r;
-  array<double,4> data1 = {1.5, -37.0/30.0, 0.0, 0.0};
-  array<double,4> data2 = {1.6, -37.0/30.0, 0.0, 0.0};
-  array<double,4> data3 = {1.212779, -37.0/30.0, 0.0, 0.0};
-  tup1 = transformCoordinates(data1, 'T', 'K');
-  printf("z: %lf w: %lf\n", tup1[0], tup1[1]);
-  array<double,4> tup1b = {tup1[0], tup1[1], 0.0, 0.0};
-  tup1r = transformCoordinates(tup1b, 'K', 'T');
-  printf("rho: %lf tau: %lf\n", tup1r[0], tup1r[1]);
-  tup2 = transformCoordinates(data2, 'T', 'K');
-  printf("z: %lf w: %lf\n", tup2[0], tup2[1]);
-  array<double,4> tup2b = {tup2[0], tup2[1], 0.0, 0.0};
-  tup2r = transformCoordinates(tup2b, 'K', 'T');
-  printf("rho: %lf rho: %lf\n", tup2r[0], tup2r[1]);
-  tup3 = transformCoordinates(data3, 'T', 'K');
-  array<double,4> tup3b = {tup3[0], tup3[1], 0.0, 0.0};
-  tup3r = transformCoordinates(tup3b, 'K', 'T');
+  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
   int i;
-  double EPSILON = 1e-14;
-  for(i = 0; i < 1; i++)
+  for(i = 0; i < fGen.size(); i++)
   {
-    if(fabs(data1[i] - tup1r[i]) > EPSILON || fabs(data2[i] - tup2r[i]) > EPSILON || fabs(data3[i] - tup3r[i]) > EPSILON)
-    {
-        printf("error: %.17lf\n", fabs(data1[i] - tup1r[i]));
-        printf("Test Failed!!!!!\n");
-        exit(1);
-    }
+    array<double, 4> element = fGen[i];
+    printf("{%lf,%lf}, ", element[0], element[1]);
   }
-  printf("Test Successful!!!!!\n");
   return 0;
 }
+*/

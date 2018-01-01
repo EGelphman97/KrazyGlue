@@ -3,16 +3,18 @@ Eric Gelphman
 University of California San Diego(UCSD)
 Department of Mathematics
 Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-October 15, 2017
+December 31, 2017
 
 KrazyGlue script to numerically solve the mean curvature equation, a nonlinear second order ODE
-Version 1.0.0
+Version 1.1.0
 """
 
+import fulminePlusPlus
 import math
 import matplotlib.pyplot as plt
-from scipy.special import lambertw
+#from scipy.special import lambertw
 
+"""
 def evalH(z, f, fp, fpp):
     r = 2*(lambertw((z**2 - f**2) / math.exp(1)).real) + 2.0
     H_Num = math.exp(r/4)*((r - 6)*(1 - fp**2)*(math.exp(-r/2)/(r - 1))*(fp*z - f) + r*fpp)
@@ -24,6 +26,25 @@ def graphH(z_vals, H_vals):
     plt.xlabel("z")
     plt.ylabel("Mean Curvature H(z)")
     plt.show()
+"""
+
+def graphF():
+    z_step = 0.002
+    nPoints = 1000
+    list = fulminePlusPlus.fGenerator5(z_step, nPoints)
+    z_vals = []
+    w_vals = []
+    for tuple in list:
+        z_vals.append(tuple[0])
+        w_vals.append(tuple[0])
+    plt.plot(z_vals, w_vals)
+    plt.xlabel("z")
+    plt.ylabel("f(z) = w")
+    plt.show()
+
+
+
+
 
 def main():
     z = 0.0
