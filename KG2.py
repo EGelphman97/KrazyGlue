@@ -3,64 +3,52 @@ Eric Gelphman
 University of California San Diego(UCSD)
 Department of Mathematics
 Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-December 31, 2017
+January 1, 2018
 
 KrazyGlue script to numerically solve the mean curvature equation, a nonlinear second order ODE
 Version 1.1.0
 """
 
-import fulminePlusPlus
-import math
 import matplotlib.pyplot as plt
-#from scipy.special import lambertw
 
-"""
-def evalH(z, f, fp, fpp):
-    r = 2*(lambertw((z**2 - f**2) / math.exp(1)).real) + 2.0
-    H_Num = math.exp(r/4)*((r - 6)*(1 - fp**2)*(math.exp(-r/2)/(r - 1))*(fp*z - f) + r*fpp)
-    H_Denom = 4*math.sqrt(2)*math.sqrt(r)*(1 - fp**2)**(3/2)
-    return H_Num / H_Denom
+#Function to read numerical data from file and to build array of 4-tuples
+#(z, f(z) = w, f'(z), f''(z))
+def readFromFileF(fileName):
+    file1 = open(fileName, 'r')
+    fGen = []#Numerical values returned by fGenerator
+    for line in file1:
+        element = line.split(' ')
+        fGen.append(element)
+    return fGen
 
-def graphH(z_vals, H_vals):
-    plt.plot(z_vals, H_vals)
-    plt.xlabel("z")
-    plt.ylabel("Mean Curvature H(z)")
-    plt.show()
-"""
-
-def graphF():
-    z_step = 0.002
-    nPoints = 1000
-    list = fulminePlusPlus.fGenerator5(z_step, nPoints)
+#Function to graph f(z)
+def graphF(list):
     z_vals = []
     w_vals = []
     for tuple in list:
         z_vals.append(tuple[0])
-        w_vals.append(tuple[0])
+        w_vals.append(tuple[1])
     plt.plot(z_vals, w_vals)
     plt.xlabel("z")
     plt.ylabel("f(z) = w")
     plt.show()
 
-
-
-
-
-def main():
-    z = 0.0
-    f = 0.0
-    fp = 0.0
-    fpp = 0.0
+def graphH(self, list):
     z_vals = []
     H_vals = []
-    while(z < 10.0):
-        if z > 0.0:
-            f = 0.1 * math.sin(z)
-        H = evalH(z, f, fp, fpp)
-        z_vals.append(z)
-        H_vals.append(H)
-        z += 0.01
-    graphH(z_vals, H_vals)
+    for tuple in list:
+        z_vals.append(tuple[0])
+        H_vals.append(tuple[1])
+    plt.plot(z_vals, H_vals)
+    plt.xlabel("z")
+    plt.ylabel("Mean Curvature H")
+    plt.show()
+
+def main():
+    fList = readFromFileF('fGenerator5.txt')
+    graphF(fList)
+    hList = fulMinePlusPlus.calcH(fList)
+    graphH(hList)
 
 
 if __name__ == "__main__":

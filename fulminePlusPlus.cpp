@@ -3,13 +3,13 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  December 31, 2017
+  January 1, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
   Version 1.1.0
 */
 
-//#include <Python.h>//Header file needed to interface with Python
+#include <stdio.h>
 #include <iostream>
 #include <vector>//std::vector
 #include <array>//std::array
@@ -324,28 +324,8 @@ vector< array<double,4> > TBKTransform(double z_step, int nPoints)
   return result;
 }
 
-/*Function to convert a vector of stl arrays of size 4 to a single array,
-with the first index storing the size of the array*/
-/*
-double* vectorToArray(vector< array<double,4> > fVals)
-{
-  double arr[4*fVals.size() + 1];//First index stores
-  int i,j,k;
-  arr[0] = arr[4*fVals.size()];
-  k = 1;
-  for(i = 0; i < 4*fVals.size(); i++)
-  {
-    for(j = 0; j < 4; j++)
-    {
-      arr[k] = fVals[i][j];
-      k++;
-    }
-  }
-  return arr;
-}*/
-
-/*Function to generate an array of doubles representing values of z, w, and the first and second derivatives.
-The firstEach set of 4 indices i, i+1, i+2, i+3represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
+/*Function to generate a vector of double arrays of size 4 representing values of z, w, and the first and second derivatives.
+Each array represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
 vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
 {
   vector< array<double,4> > result;
@@ -362,8 +342,7 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
   {
     result.push_back(fGlueS[i]);
   }
-  //double* arr = vectorToArray(result);//Convert 4-tuples to array so it can be compiled using a C compiler
-  return result;//Return array
+  return result;//Return vector
 }
 
 
@@ -483,15 +462,25 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
   return hValues;
 }
 
-int main()
+/*Function to output the numerical data from fGeneratorPlusPlus to a file*/
+void outputToFile(vector< array<double,4> > fGen)
 {
-  /*
-  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
+  FILE* file1;
+  file1 = fopen("fGenerator5.txt", "w");
   int i;
   for(i = 0; i < fGen.size(); i++)
   {
-    array<double, 4> element = fGen[i];
-    printf("{%lf,%lf}, ", element[0], element[1]);
-  }*/
+      array<double,4> element = fGen[i];
+      /*Print formatted string in this format: z f(z) = w f'(z) f''(z) where each
+      value is separated by a space*/
+      fprintf(file1, "%.15lf %.15lf %.15lf %.15lf\n", element[0], element[1], element[2], element[3]);
+  }
+  fclose(file1);
+}
+
+int main()
+{
+  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
+  outputToFile(fGen);//Output to file
   return 0;
 }
