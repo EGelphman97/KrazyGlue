@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 
 #Function to read numerical data from file and to build array of 4-tuples
 #(z, f(z) = w, f'(z), f''(z))
-def readFromFileF(fileName):
+def readFromFile(fileName):
     file1 = open(fileName, 'r')
-    fGen = []#Numerical values returned by fGenerator
+    list = []#Numerical values returned by fGenerator or calculateH, it works for both
     for line in file1:
         element = line.split(' ')
-        fGen.append(element)
-    return fGen
+        list.append(element)
+    return list
 
 #Function to graph f(z)
 def graphF(list):
@@ -33,7 +33,7 @@ def graphF(list):
     plt.ylabel("f(z) = w")
     plt.show()
 
-def graphH(self, list):
+def graphH(list):
     z_vals = []
     H_vals = []
     for tuple in list:
@@ -45,9 +45,9 @@ def graphH(self, list):
     plt.show()
 
 def main():
-    fList = readFromFileF('fGenerator5.txt')
-    graphF(fList)
-    hList = fulMinePlusPlus.calcH(fList)
+    #fList = readFromFile('fGenerator5.txt')
+    #graphF(fList)
+    hList = readFromFile('outputH.txt')
     graphH(hList)
 
 

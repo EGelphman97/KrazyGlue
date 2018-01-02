@@ -463,7 +463,7 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
 }
 
 /*Function to output the numerical data from fGeneratorPlusPlus to a file*/
-void outputToFile(vector< array<double,4> > fGen)
+void outputToFileF(vector< array<double,4> > fGen)
 {
   FILE* file1;
   file1 = fopen("fGenerator5.txt", "w");
@@ -478,9 +478,26 @@ void outputToFile(vector< array<double,4> > fGen)
   fclose(file1);
 }
 
+/*Function to output the numerical data from calculateH to a file*/
+void outputToFileH(vector< array<double,2> > h_values)
+{
+  FILE* file1;
+  file1 = fopen("outputH.txt", "w");
+  int i;
+  for(i = 0; i < h_values.size(); i++)
+  {
+      array<double,2> element = h_values[i];
+      /*Print formatted string in this format: z H where z and H are separated by a space*/
+      fprintf(file1, "%.15lf %.15lf\n", element[0], element[1]);
+  }
+  fclose(file1);
+}
+
 int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
-  outputToFile(fGen);//Output to file
+  outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
+  vector< array<double,2> > h_vals = calculateH(fGen);
+  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
