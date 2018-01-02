@@ -169,6 +169,26 @@ array<double,4> KTBTransform(array<double,4> vals)
   return result;
 }
 
+/*Function to compute the transformation T: (rho, g(rho) = tau) ---> (z, f(z) = w),
+where each ordered pair is represented by an array of size 2
+*/
+array<double,2> discTBKTransform(array<double,2> rhotau)
+{
+  double z, w;//What is going to be returned
+  double rho = rhotau[0];
+  double tau = rhotau[1];
+  double r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
+  double sqr = sqrt(r);
+  double a = r + 2.0*log((r/2.0) - 1);
+  double e_t_4 = exp(-(sqr/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqr)/(sqrt(2.0) - sqr)));
+  double U = (-exp(a/4.0)) / e_t_4;
+  double V = exp(a/4.0) * e_t_4;
+  z = (V - U) / 2.0;
+  w = (V + U) / 2.0;
+  array<double,2> result = {z, w};//Build output ordered pair
+  return result;
+}
+
 //Recursive helper function for binarySearch()
 array<double,2> binSearch(int low, int high, vector< array<double,2> > vals, double key)
 {
@@ -244,25 +264,25 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
       tau = -1.84115*pow(rho,3) + 0.720532*pow(rho,2) + 0.6651*rho - 1.713532;
     else//Friedman region
       tau = -(double)37.0 / 30.0;
-    double r = pow(4.5, 1.0/3.0)*pow(rho - tau, 2.0/3.0);
-    double sqr = sqrt(r);
-    double a = r + 2.0*log((r/2.0) - 1);
-    double e_t_4 = exp(-(sqr/sqrt(2.0)) + tau/4.0)*sqrt(fabs((sqrt(2.0) + sqr)/(sqrt(2.0) - sqr)));
-    double U = (-exp(a/4.0)) / e_t_4;
-    double V = exp(a/4.0) * e_t_4;
-    array<double,2> element = {(V - U) / 2.0, (V + U) / 2.0};// (z, f(z) = w)
+    array<double,2> rhotau = {rho, tau};// (rho, tau) to be transformed
+    array<double,2> element = discTBKTransform(rhotau);//What is going to be returned
     zw.push_back(element);//Append array to vector
     rho += rho_step;
   }
   double z = zw[0][0];
-  for(i = 0; i < nPoints; i++)//Iterate based on index in vector
+  array<double,2> rhotauEnd = {GAMMA, -37.0 / 30.0};
+  array<double,2> zwEnd = discTBKTransform(rhotauEnd);
+  double z_end = zwEnd[0];//z value to signal the end of the iteration
+  int firstFlag = 1;
+  while(z < z_end)
   {
     array<double,2> element;
-    if(i == 0)//First element is special case
+    if(firstFlag == 1)//First element is special case
     {
       element[0] = z;
       element[1] = zw[0][1];//Corresponding w value for z0 = zw[0][0]
       result.push_back(element);//z, element at index 0 in zw
+      firstFlag = 0;//Case handled
     }
     else//General case
     {
@@ -272,12 +292,6 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
       result.push_back(element);
     }
     z += z_step;
-  }
-  int j = result.size() - 1;
-  while(fabs(result[j][1] - result[j - 1][1]) <= EPSILON)//Trim end
-  {
-      result.pop_back();
-      j--;
   }
   return result;
 }
@@ -422,14 +436,12 @@ double calcHGF(array<double,4> kCoords)
       printf("Error! Cannot Have a Negative Number Raised to the Power 3/2!\n");
       printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
       exit(1);
-      //return NULL;
   }
   else if(H_Denom == 0.0)//If the denominator = 0, throw an exception
   {
       printf("Error! Cannot Divide by 0!\n");
       printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
       exit(1);
-      //return NULL;
   }
   double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) -(pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
   H = H_Num / H_Denom;
@@ -497,7 +509,7 @@ int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
   outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  vector< array<double,2> > h_vals = calculateH(fGen);
-  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  //vector< array<double,2> > h_vals = calculateH(fGen);
+  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
