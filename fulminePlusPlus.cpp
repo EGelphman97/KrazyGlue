@@ -261,8 +261,8 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
   for(i = 0; i < nPoints; i++)//Iterate based on list index i, increment rho seperately
   {
     if(rho < BETA)//Glue region
-      tau = -1.84115*pow(rho,3) + 0.720532*pow(rho,2) + 0.6651*rho - 1.713532;
-    else//Friedman region
+      tau = 59.9385*pow(rho,5) - 90.5157*pow(rho,4) + 46.7512*pow(rho,3) - 9.2764*pow(rho,2) + 1.53418*rho - 1.74107;
+    else if(BETA <= rho && rho <= GAMMA)//Friedman region
       tau = -(double)37.0 / 30.0;
     array<double,2> rhotau = {rho, tau};// (rho, tau) to be transformed
     array<double,2> element = discTBKTransform(rhotau);//What is going to be returned
@@ -385,7 +385,7 @@ double calcHGF(array<double,4> kCoords)
   double fpp = tbCoords[3];
   double X, Y, dX_dr, dX_dt, dY_dr, dY_dt;
   static double H;
-  if(r >= 1.2)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 0.5
+  if(r >= 1.2)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
   {
     X = (pow(3,0.6666666666666666)*pow(r,2)*(1 - t))/(pow(2,0.3333333333333333)*pow(pow(r,6)*(1.0 - t),0.3333333333333333));
     dX_dr = 0.0;
@@ -394,7 +394,7 @@ double calcHGF(array<double,4> kCoords)
     dY_dr = pow(4.50, 1.0/3.0)*pow(1 - t, 2.0/3);
     dY_dt = (-1.100642416*r) / pow(1 - t, 1.0/3);
   }
-  else//Glue Region applies for 0.1 < r < 0.5
+  else//Glue Region applies for 0.8 < r < 0.2
   {
     X = (2*(-27 + 90*r - 93.75*pow(r,2) + 31.25*pow(r,3))*(1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5)) +
         (-21.6 + 176.4*r - 414.75*pow(r,2) + 378.75*pow(r,3) - 117.1875*pow(r,4))*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t))/
@@ -460,7 +460,7 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
   {
     array<double,4> element = fVals[i];
     double z = element[0];
-    if(z < 0.80360287983844092)//Schwarzschild region
+    if(z <= 0.80360287983844092)//Schwarzschild region
     {
       H = calcHS(element);
     }
@@ -507,8 +507,11 @@ void outputToFileH(vector< array<double,2> > h_values)
 
 int main()
 {
-  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
-  outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
+  //vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
+  //outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
+  array<double,2> zw0 = {0.8, 0.0};
+  array<double,2> zw1 = discTBKTransform(zw0);
+  printf("New z-bound: %.16lf\n", zw1[0]);
   //vector< array<double,2> > h_vals = calculateH(fGen);
   //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
