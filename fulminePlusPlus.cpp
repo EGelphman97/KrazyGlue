@@ -3,7 +3,7 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  January 1, 2018
+  January 4, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
   Version 1.1.0
@@ -17,9 +17,10 @@
 using namespace std;
 
 double ALPHA = 0.1;//rho parameters
-double BETA = 0.5;
+double BETA = 0.7;
 double GAMMA = 2.0;
 double EPSILON = 1.0e-15;//Slightly better than machine precision
+double TAUFRIEDMAN = -1.7;
 
 //Function to compute the lambert W-function
 double LambertW(const double z);
@@ -238,12 +239,16 @@ double interpolate(double key, vector< array<double,2> > vals)
   double val;
   if(key > vals[vals.size() - 1][0])//Special case
     val = vals[vals.size() - 1][1];
-  else
+  else//Linear interpolation
   {
     array<double,2> indices = binarySearch(vals, key);
-    val = (vals[indices[0]][1] + vals[indices[1]][1]) / 2.0;
+    double x1 = vals[indices[0]][0];
+    double y1 = vals[indices[0]][1];
+    double m = (vals[indices[1]][1] - y1) / (vals[indices[1]][0] - x1);//Calculate slope
+    double B = -m*x1 + y1;//Calculate y-intercept
+    val = m*key + B;//y = mx + b
   }
-  return val;//Return average of w-values at the two indices in vals
+  return val;
 }
 
 /*Function to generate a vector of ordered pairs(implemented as arrays of size 2) (z, w)
@@ -261,16 +266,16 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
   for(i = 0; i < nPoints; i++)//Iterate based on list index i, increment rho seperately
   {
     if(rho < BETA)//Glue region
-      tau = 59.9385*pow(rho,5) - 90.5157*pow(rho,4) + 46.7512*pow(rho,3) - 9.2764*pow(rho,2) + 1.53418*rho - 1.74107;
+      tau = -21.4297*pow(rho,5) + 44.4792*pow(rho,4) - 30.4045*pow(rho,3) + 6.5843*pow(rho,2) + 0.177418*rho - 1.69953;
     else if(BETA <= rho && rho <= GAMMA)//Friedman region
-      tau = -(double)37.0 / 30.0;
+      tau = TAUFRIEDMAN;
     array<double,2> rhotau = {rho, tau};// (rho, tau) to be transformed
     array<double,2> element = discTBKTransform(rhotau);//What is going to be returned
     zw.push_back(element);//Append array to vector
     rho += rho_step;
   }
   double z = zw[0][0];
-  array<double,2> rhotauEnd = {GAMMA, -37.0 / 30.0};
+  array<double,2> rhotauEnd = {GAMMA, TAUFRIEDMAN};
   array<double,2> zwEnd = discTBKTransform(rhotauEnd);
   double z_end = zwEnd[0];//z value to signal the end of the iteration
   int firstFlag = 1;
@@ -300,10 +305,11 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
 Returns a vector of arrays of size 4, with the array of size 4 representing the 4-tuple (z, f(z) = w, f'(z), f''(z))*/
 vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 {
-  vector< array<double,2> > constZStep = getConstZStep(z_step, nPoints);
+  vector< array<double,2> > constZStep = getConstZStep(z_step, nPoints);//Transform (rho, g(rho)) |--> (z, f(z))
   vector< array<double,4> > result;
+  //Transform (g'(rho), g''(rho)) |--> (f'(z), f''(z))
   int i;
-  double h = (constZStep[constZStep.size() - 1][0] - constZStep[0][0]) / 2.0;
+  double h = z_step;//step size
   for(i = 0; i < constZStep.size(); i++)
   {
     array<double,4> element;
@@ -394,7 +400,7 @@ double calcHGF(array<double,4> kCoords)
     dY_dr = pow(4.50, 1.0/3.0)*pow(1 - t, 2.0/3);
     dY_dt = (-1.100642416*r) / pow(1 - t, 1.0/3);
   }
-  else//Glue Region applies for 0.8 < r < 0.2
+  else//Glue Region applies for 0.8 < r < 1.2
   {
     X = (2*(-27 + 90*r - 93.75*pow(r,2) + 31.25*pow(r,3))*(1.512 - 21.6*r + 88.2*pow(r,2) - 138.25*pow(r,3) + 94.6875*pow(r,4) - 23.4375*pow(r,5)) +
         (-21.6 + 176.4*r - 414.75*pow(r,2) + 378.75*pow(r,3) - 117.1875*pow(r,4))*(6.4 - 27*r + 45*pow(r,2) - 31.25*pow(r,3) + 7.8125*pow(r,4) - t))/
@@ -434,13 +440,15 @@ double calcHGF(array<double,4> kCoords)
   if(isnan(H_Denom))//If there is a negative number under the radical, throw an exception
   {
       printf("Error! Cannot Have a Negative Number Raised to the Power 3/2!\n");
-      printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
+      printf("r= %lf f'(r)= %lf X= %lf\n", r, fp, X);
+      printf("z= %lf f'(z)= %lf\n", kCoords[0], kCoords[2]);
       exit(1);
   }
   else if(H_Denom == 0.0)//If the denominator = 0, throw an exception
   {
       printf("Error! Cannot Divide by 0!\n");
       printf("r= %lf f'= %lf X= %lf\n", r, fp, X);
+      printf("z= %lf f'(z)= %lf\n", kCoords[0], kCoords[2]);
       exit(1);
   }
   double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) -(pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
@@ -460,7 +468,10 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
   {
     array<double,4> element = fVals[i];
     double z = element[0];
-    if(z <= 0.80360287983844092)//Schwarzschild region
+    array<double,2> rhotau = {0.8, TAUFRIEDMAN};
+    array<double,2> trans = discTBKTransform(rhotau);
+    double threshold = trans[0];//z-value where rho = 0.8
+    if(z <= threshold)//Schwarzschild region, rho <= 0.8
     {
       H = calcHS(element);
     }
@@ -468,6 +479,7 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
     {
       H = calcHGF(element);
     }
+    printf("z: %lf H: %lf\n", z, H);
     array<double,2> nElem = {element[0], H};//Build ordered pair
     hValues.push_back(nElem);//Append ordered pair to vector
   }
@@ -507,11 +519,8 @@ void outputToFileH(vector< array<double,2> > h_values)
 
 int main()
 {
-  //vector< array<double,4> > fGen = fGeneratorPlusPlus(0.002, 1000);//fGenerator's Newest Form
-  //outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  array<double,2> zw0 = {0.8, 0.0};
-  array<double,2> zw1 = discTBKTransform(zw0);
-  printf("New z-bound: %.16lf\n", zw1[0]);
+  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
+  outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
   //vector< array<double,2> > h_vals = calculateH(fGen);
   //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
