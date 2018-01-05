@@ -20,7 +20,7 @@ double ALPHA = 0.1;//rho parameters
 double BETA = 0.7;
 double GAMMA = 2.0;
 double EPSILON = 1.0e-15;//Slightly better than machine precision
-double TAUFRIEDMAN = -1.7;
+double TAUFRIEDMAN = -1.9;
 
 //Function to compute the lambert W-function
 double LambertW(const double z);
@@ -266,7 +266,7 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
   for(i = 0; i < nPoints; i++)//Iterate based on list index i, increment rho seperately
   {
     if(rho < BETA)//Glue region
-      tau = -21.4297*pow(rho,5) + 44.4792*pow(rho,4) - 30.4045*pow(rho,3) + 6.5843*pow(rho,2) + 0.177418*rho - 1.69953;
+      tau = -36.8618*pow(rho,5) + 75.3434*pow(rho,4) - 50.4662*pow(rho,3) + 10.9053*pow(rho,2) - 0.200668*rho - 1.68781;
     else if(BETA <= rho && rho <= GAMMA)//Friedman region
       tau = TAUFRIEDMAN;
     array<double,2> rhotau = {rho, tau};// (rho, tau) to be transformed
@@ -389,6 +389,7 @@ double calcHGF(array<double,4> kCoords)
   double t = tbCoords[1];
   double fp = tbCoords[2];
   double fpp = tbCoords[3];
+  printf("r: %lf f(r): %lf f'(r): %lf f''(r): %lf\n", r, t, fp, fpp);
   double X, Y, dX_dr, dX_dt, dY_dr, dY_dt;
   static double H;
   if(r >= 1.2)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
