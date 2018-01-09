@@ -3,7 +3,7 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  January 4, 2018
+  January 8, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
   Version 1.1.0
@@ -19,6 +19,8 @@ using namespace std;
 double ALPHA = 0.1;//rho parameters
 double BETA = 0.7;
 double GAMMA = 2.0;
+double A = 0.899273955475691;//z parameters, where rho = ALPHA, z = A and where rho = BETA, z = B
+double B = 1.543085489117902;
 double EPSILON = 1.0e-15;//Slightly better than machine precision
 double TAUFRIEDMAN = -1.65;
 
@@ -171,17 +173,14 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
 {
   vector< array<double,2> > result;
   //Generate values of rho and tau for ALPHA < rho <= GAMMA
-  double rho_step = (GAMMA - ALPHA) / (double)nPoints;
-  double rho = ALPHA;
+  double rho_step = (GAMMA - BETA) / (double)nPoints;
+  double rho = BETA;
   double tau;
   vector< array<double,2> > zw;
   int i;
   for(i = 0; i < nPoints; i++)//Iterate based on list index i, increment rho seperately
   {
-    if(rho < BETA)//Glue region
-      tau = -17.5716*pow(rho,5) + 36.7632*pow(rho,4) - 25.3891*pow(rho,3) + 5.50405*pow(rho,2) + 0.27194*rho - 1.70247;
-    else if(BETA <= rho && rho <= GAMMA)//Friedman region
-      tau = TAUFRIEDMAN;
+    tau = TAUFRIEDMAN;
     array<double,2> rhotau = {rho, tau};// (rho, tau) to be transformed
     array<double,2> element = discTBKTransform(rhotau);//What is going to be returned
     zw.push_back(element);//Append array to vector
@@ -262,13 +261,26 @@ Each array represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
 vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
 {
   vector< array<double,4> > result;
-  double a = 0.80360287983844092;//corresponding z-value for rho = ALPHA
   double z;
-  for(z = 0.0; z <= a; z += step_size)
+  //Generate values for 0.0 <= z <= B
+  for(z = 0.0; z <= B; z += step_size)
   {
-      array<double, 4> element = {z, 0.0, 0.0, 0.0};
-      result.push_back(element);
+      if(z <= A)
+      {
+        array<double, 4> element = {z, 0.0, 0.0, 0.0};
+        result.push_back(element);
+      }
+      else//Glue region for f(z)
+      {
+        double f, fp, fpp;
+        f = -18.4514*pow(z,5) + 114.384*pow(z,4) - 277.203*pow(z,3) + 327.02*pow(z,2) - 188.047*z + 42.2849;
+        fp = -92.257*pow(z,4) + 457.536*pow(z,3) - 831.609*pow(z,2) + 654.04*z - 188.047;
+        fpp = -369.028*pow(z,3) + 1372.608*pow(z,2) - 1663.218*z + 654.04;
+        array<double, 4> elem = {z, f, fp, fpp};
+        result.push_back(elem);
+      }
   }
+  //Generate values for B < z <= C, where C is the corresponding value of z for rho = GAMMA
   vector< array<double,4> > fGlueS = TBKTransform(step_size, nPoints);
   int i;
   for(i = 0; i < fGlueS.size(); i++)//Append contents of fGlueS to result
@@ -383,15 +395,18 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
     array<double,2> rhotau = {0.8, TAUFRIEDMAN};
     array<double,2> trans = discTBKTransform(rhotau);
     double threshold = trans[0];//z-value where rho = 0.8
+    array<double,2> zw = {z, element[1]};
+    array<double,2> rt = KTBTransform2(zw);
     if(z <= threshold)//Schwarzschild region, rho <= 0.8
     {
       H = calcHS(element);
+      printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     }
     else//Glue and Friedman Regions
     {
       H = calcHGF(element);
+      printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     }
-    printf("z: %lf H: %lf\n", z, H);
     array<double,2> nElem = {element[0], H};//Build ordered pair
     hValues.push_back(nElem);//Append ordered pair to vector
   }
@@ -433,7 +448,7 @@ int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
   outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  vector< array<double,2> > h_vals = calculateH(fGen);
-  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  //vector< array<double,2> > h_vals = calculateH(fGen);
+  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
