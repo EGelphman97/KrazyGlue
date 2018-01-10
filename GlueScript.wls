@@ -1,7 +1,7 @@
 #!/usr/bin/env wolframscript
 (* ::Package:: *)
 
-z1=0.8992739554756911;
+z1=0.75;
 w1=0.0;
 fp1=0.0;
 fpp1=0.0;
