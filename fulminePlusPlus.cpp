@@ -3,10 +3,10 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  January 8, 2018
+  January 9, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
-  Version 1.1.0
+  Version 1.2.0
 */
 
 #include <stdio.h>
@@ -16,11 +16,10 @@
 #include <cmath>
 using namespace std;
 
-double ALPHA = 0.1;//rho parameters
 double BETA = 0.7;
 double GAMMA = 2.0;
-double A = 0.899273955475691;//z parameters, where rho = ALPHA, z = A and where rho = BETA, z = B
-double B = 1.543085489117902;
+double A = 0.40;//z parameters
+double B = 1.543085489117902;//When rho = BETA, z = B
 double EPSILON = 1.0e-15;//Slightly better than machine precision
 double TAUFRIEDMAN = -1.65;
 
@@ -273,9 +272,9 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
       else//Glue region for f(z)
       {
         double f, fp, fpp;
-        f = -18.4514*pow(z,5) + 114.384*pow(z,4) - 277.203*pow(z,3) + 327.02*pow(z,2) - 188.047*z + 42.2849;
-        fp = -92.257*pow(z,4) + 457.536*pow(z,3) - 831.609*pow(z,2) + 654.04*z - 188.047;
-        fpp = -369.028*pow(z,3) + 1372.608*pow(z,2) - 1663.218*z + 654.04;
+        f = -0.340246*pow(z,5) + 1.95888*pow(z,4) - 4.03314*pow(z,3) + 3.17701*pow(z,2) - 1.06362*z + 0.128584;
+        fp = -1.70123*pow(z,4) + 7.83552*pow(z,3) - 12.0994*pow(z,2) + 6.35402*z - 1.06362;
+        fpp = -6.80492*pow(z,3) + 23.5066*pow(z,2) - 24.1988*z + 6.35402;
         array<double, 4> elem = {z, f, fp, fpp};
         result.push_back(elem);
       }
@@ -290,6 +289,24 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
   return result;//Return vector
 }
 
+/*
+//Function to do finite difference
+array<double,4> finiteDiffGRho(double h_B, double h_F, double rho_center, double tau_back, double tau_center, double tau_forward)
+{
+  double h_B = kcoords_center[0] - kcoords_back[0];
+  double h_F = kcoords_forward[0] - kcoords_center[0];
+  double tau_back = kcoords_back[1];
+  double tau_center = kcoords_center[1];
+  double tau_forward = kcoords_forward[1];
+  double del_B = (tau_center - tau_back) / h_B;
+  double del_F = (tau_forward - tau_center) / h_F;
+  double gp = (del_B + del_F) / 2.0;
+  double del2_B = (gp - del_B) / h_B;
+  double del2_F = (del_F - gp) / h_F;
+  double gpp = (del2_B + del2_F) / 2.0;
+  array<double,4> result = {rho_center, tau_center, gp, gpp};
+  return result;
+}*/
 
 //Function to calculate the mean curvature H(z,w) in the Schwarzschild region
 double calcHS(array<double,4> fVals)
@@ -301,6 +318,7 @@ double calcHS(array<double,4> fVals)
   double r = 2.0*LambertW(((z*z) - (f*f)) / exp(1)) + 2.0;
   double H_Num = exp(r/4.0)*(((r-6.0)*(1.0 - (fp*fp))*(exp(-r/2.0)/(r-1))*(fp*z - f)) + r*fpp);
   double H_Denom = 4*sqrt(2.0)*pow(1.0 - (fp*fp), 3.0/2.0)*sqrt(r);
+  printf("HNum: %.10lf HDenom: %.10lf r: %lf\n", H_Num, H_Denom, r);
   double H = H_Num / H_Denom;
   return H;
 }
@@ -388,25 +406,24 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
   vector< array<double,2> > hValues;
   int i;
   double H;
+  array<double,2> rhotau = {0.8, TAUFRIEDMAN};
+  array<double,2> trans = discTBKTransform(rhotau);
+  double threshold = trans[0];//z-value where rho = 0.8
   for(i = 0; i < fVals.size(); i++)
   {
     array<double,4> element = fVals[i];
     double z = element[0];
-    array<double,2> rhotau = {0.8, TAUFRIEDMAN};
-    array<double,2> trans = discTBKTransform(rhotau);
-    double threshold = trans[0];//z-value where rho = 0.8
     array<double,2> zw = {z, element[1]};
     array<double,2> rt = KTBTransform2(zw);
     if(z <= threshold)//Schwarzschild region, rho <= 0.8
     {
       H = calcHS(element);
-      printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     }
     else//Glue and Friedman Regions
     {
       H = calcHGF(element);
-      printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     }
+    printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     array<double,2> nElem = {element[0], H};//Build ordered pair
     hValues.push_back(nElem);//Append ordered pair to vector
   }
@@ -448,7 +465,7 @@ int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
   outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  //vector< array<double,2> > h_vals = calculateH(fGen);
-  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  vector< array<double,2> > h_vals = calculateH(fGen);
+  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
