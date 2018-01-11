@@ -3,10 +3,10 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  January 9, 2018
+  January 10, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
-  Version 1.2.0
+  Version 1.2.3
 */
 
 #include <stdio.h>
@@ -16,10 +16,10 @@
 #include <cmath>
 using namespace std;
 
-double BETA = 0.7;
+double BETA = 0.8;
 double GAMMA = 2.0;
 double A = 0.40;//z parameters
-double B = 1.543085489117902;//When rho = BETA, z = B
+double B = 1.681784648834992;//When rho = BETA, z = B
 double EPSILON = 1.0e-15;//Slightly better than machine precision
 double TAUFRIEDMAN = -1.65;
 
@@ -213,7 +213,8 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
 }
 
 /*Function to compute the transfromation T: (rho, g(rho) = tau, g'(rho), g''(rho)) |--> (z, f(z) = w, f'(z), f''(z))
-Returns a vector of arrays of size 4, with the array of size 4 representing the 4-tuple (z, f(z) = w, f'(z), f''(z))*/
+Returns a vector of arrays of size 4, with the array of size 4 representing the 4-tuple (z, f(z) = w, f'(z), f''(z))
+Parameters: step_size is the constant z-step, nPoints is a paramter necessary to generate values of (rho, tau)*/
 vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 {
   vector< array<double,2> > constZStep = getConstZStep(z_step, nPoints);//Transform (rho, g(rho)) |--> (z, f(z))
@@ -227,24 +228,24 @@ vector< array<double,4> > TBKTransform(double z_step, int nPoints)
     double z = constZStep[i][0];
     double w = constZStep[i][1];
     double fp, fpp;//f'(z), f''(z)
-    if(i == 0)//First endpoint
+    if(i < 2)//First 2 points
     {
       fp = (-3.0*w + 4.0*constZStep[i + 1][1] - constZStep[i + 2][1]) / (2.0*h);//3 - point endpoint
       double fpplus1 = (constZStep[i + 2][1] - w) / (2.0*h);
       double fpplus2 = (constZStep[i + 3][1] - constZStep[i + 1][1]) / (2.0*h);
       fpp = (-3.0*fp + 4.0*fpplus1 - fpplus2) / (2.0*h);//Compute f'' in similar manner to f'
     }
-    else if(i == constZStep.size() - 1)//Last endpoint
+    else if(i >= constZStep.size() - 2)//Last 2 points
     {
       fp = (-3.0*w + 4.0*constZStep[i - 1][1] - constZStep[i - 2][1]) / (2.0*h);//3 - point endpoint
       double fpminus1 = (w - constZStep[i - 2][1]) / (2.0*h);
       double fpminus2 = (constZStep[i - 3][1] - constZStep[i - 1][1]) / (2.0*h);
       fpp = (-3.0*fp + 4.0*fpminus1 - fpminus2) / (2.0*h);//Compute f'' in similar manner to f'
     }
-    else//Use 3-point midpoint formulas
+    else//Use midpoint formulas
     {
-      fp = (constZStep[i + 1][1] - constZStep[i - 1][1]) / (2.0*h);
-      fpp = (constZStep[i - 1][1] - 2.0*w + constZStep[i + 1][1]) / (h*h);
+      fp = (constZStep[i - 2][1] - 8.0*constZStep[i - 1][1] + 8.0*constZStep[i + 1][1] - constZStep[i + 2][1]) / (12.0*h);//5-point midpoint
+      fpp = (constZStep[i - 1][1] - 2.0*w + constZStep[i + 1][1]) / (h*h);//3-point midpoint
     }
     element[0] = z;
     element[1] = w;
@@ -256,7 +257,9 @@ vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 }
 
 /*Function to generate a vector of double arrays of size 4 representing values of z, w, and the first and second derivatives.
-Each array represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).*/
+Each array represents the 4-tuple (z, f(z) = w, f'(z), f''(z)).
+Parameters: step_size is the constant z-step, nPoints is a parameter needed to first generate ordered pairs (rho, tau) to start the
+interpolation*/
 vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
 {
   vector< array<double,4> > result;
@@ -272,13 +275,14 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
       else//Glue region for f(z)
       {
         double f, fp, fpp;
-        f = -0.340246*pow(z,5) + 1.95888*pow(z,4) - 4.03314*pow(z,3) + 3.17701*pow(z,2) - 1.06362*z + 0.128584;
-        fp = -1.70123*pow(z,4) + 7.83552*pow(z,3) - 12.0994*pow(z,2) + 6.35402*z - 1.06362;
-        fpp = -6.80492*pow(z,3) + 23.5066*pow(z,2) - 24.1988*z + 6.35402;
+        f = -0.301226*pow(z,5) + 1.78531*pow(z,4) - 3.75935*pow(z,3) + 2.99011*pow(z,2) - 1.00608*z + 0.121994;
+        fp = -1.50613*pow(z,4) + 7.14124*pow(z,3) - 11.2781*pow(z,2) + 5.98022*z - 1.00608;
+        fpp = -6.02452*pow(z,3) + 21.4237*pow(z,2) - 22.5561*z + 5.98022;
         array<double, 4> elem = {z, f, fp, fpp};
         result.push_back(elem);
       }
   }
+  int end = result.size();
   //Generate values for B < z <= C, where C is the corresponding value of z for rho = GAMMA
   vector< array<double,4> > fGlueS = TBKTransform(step_size, nPoints);
   int i;
@@ -406,16 +410,13 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
   vector< array<double,2> > hValues;
   int i;
   double H;
-  array<double,2> rhotau = {0.8, TAUFRIEDMAN};
-  array<double,2> trans = discTBKTransform(rhotau);
-  double threshold = trans[0];//z-value where rho = 0.8
   for(i = 0; i < fVals.size(); i++)
   {
     array<double,4> element = fVals[i];
     double z = element[0];
     array<double,2> zw = {z, element[1]};
     array<double,2> rt = KTBTransform2(zw);
-    if(z <= threshold)//Schwarzschild region, rho <= 0.8
+    if(z <= B)//Schwarzschild region, rho <= 0.8
     {
       H = calcHS(element);
     }
@@ -423,7 +424,7 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
     {
       H = calcHGF(element);
     }
-    printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
+    //printf("rho: %lf z: %lf H: %lf\n", rt[0], z, H);
     array<double,2> nElem = {element[0], H};//Build ordered pair
     hValues.push_back(nElem);//Append ordered pair to vector
   }
@@ -465,7 +466,7 @@ int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
   outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  vector< array<double,2> > h_vals = calculateH(fGen);
-  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  //vector< array<double,2> > h_vals = calculateH(fGen);
+  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
