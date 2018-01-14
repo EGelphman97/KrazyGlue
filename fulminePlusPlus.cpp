@@ -3,7 +3,7 @@
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
 
-  January 10, 2018
+  January 13, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
 
   Version 1.2.3
@@ -16,12 +16,14 @@
 #include <cmath>
 using namespace std;
 
-double BETA = 0.8;
+double BETA = 0.77;
+double METRIC_GLUE_END_TB = 1.2;//Right endpoint of Glue region for the metric
 double GAMMA = 2.0;
 double A = 0.40;//z parameters
-double B = 1.681784648834992;//When rho = BETA, z = B
+double B = 1.7532659415312257;//When rho = BETA, z = B
+double METRIC_GLUE_START_K = 1.7971791856538628;//Start of gluing of metric in Kruskal coordinates
 double EPSILON = 1.0e-15;//Slightly better than machine precision
-double TAUFRIEDMAN = -1.65;
+double TAUFRIEDMAN = -1.72;//Tau in region where tau is constant
 
 //Function to compute the lambert W-function
 double LambertW(const double z);
@@ -159,8 +161,8 @@ double interpolate(double key, vector< array<double,2> > vals)
     double x1 = vals[indices[0]][0];
     double y1 = vals[indices[0]][1];
     double m = (vals[indices[1]][1] - y1) / (vals[indices[1]][0] - x1);//Calculate slope
-    double B = -m*x1 + y1;//Calculate y-intercept
-    val = m*key + B;//y = mx + b
+    double B1 = -m*x1 + y1;//Calculate y-intercept
+    val = m*key + B1;//y = mx + b
   }
   return val;
 }
@@ -275,14 +277,13 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
       else//Glue region for f(z)
       {
         double f, fp, fpp;
-        f = -0.301226*pow(z,5) + 1.78531*pow(z,4) - 3.75935*pow(z,3) + 2.99011*pow(z,2) - 1.00608*z + 0.121994;
-        fp = -1.50613*pow(z,4) + 7.14124*pow(z,3) - 11.2781*pow(z,2) + 5.98022*z - 1.00608;
-        fpp = -6.02452*pow(z,3) + 21.4237*pow(z,2) - 22.5561*z + 5.98022;
+        f = -0.293097*pow(z,5) + 1.76343*pow(z,4) - 3.75143*pow(z,3) + 2.99641*pow(z,2) - 1.01036*z + 0.122668;
+        fp = -1.46549*pow(z,4) + 7.05371*pow(z,3) - 11.2543*pow(z,2) + 5.99282*z - 1.01036;
+        fpp = -5.86194*pow(z,3) + 21.1611*pow(z,2) - 22.5086*z + 5.99282;
         array<double, 4> elem = {z, f, fp, fpp};
         result.push_back(elem);
       }
   }
-  int end = result.size();
   //Generate values for B < z <= C, where C is the corresponding value of z for rho = GAMMA
   vector< array<double,4> > fGlueS = TBKTransform(step_size, nPoints);
   int i;
@@ -292,25 +293,6 @@ vector< array<double,4> > fGeneratorPlusPlus(double step_size, int nPoints)
   }
   return result;//Return vector
 }
-
-/*
-//Function to do finite difference
-array<double,4> finiteDiffGRho(double h_B, double h_F, double rho_center, double tau_back, double tau_center, double tau_forward)
-{
-  double h_B = kcoords_center[0] - kcoords_back[0];
-  double h_F = kcoords_forward[0] - kcoords_center[0];
-  double tau_back = kcoords_back[1];
-  double tau_center = kcoords_center[1];
-  double tau_forward = kcoords_forward[1];
-  double del_B = (tau_center - tau_back) / h_B;
-  double del_F = (tau_forward - tau_center) / h_F;
-  double gp = (del_B + del_F) / 2.0;
-  double del2_B = (gp - del_B) / h_B;
-  double del2_F = (del_F - gp) / h_F;
-  double gpp = (del2_B + del2_F) / 2.0;
-  array<double,4> result = {rho_center, tau_center, gp, gpp};
-  return result;
-}*/
 
 //Function to calculate the mean curvature H(z,w) in the Schwarzschild region
 double calcHS(array<double,4> fVals)
@@ -322,7 +304,6 @@ double calcHS(array<double,4> fVals)
   double r = 2.0*LambertW(((z*z) - (f*f)) / exp(1)) + 2.0;
   double H_Num = exp(r/4.0)*(((r-6.0)*(1.0 - (fp*fp))*(exp(-r/2.0)/(r-1))*(fp*z - f)) + r*fpp);
   double H_Denom = 4*sqrt(2.0)*pow(1.0 - (fp*fp), 3.0/2.0)*sqrt(r);
-  printf("HNum: %.10lf HDenom: %.10lf r: %lf\n", H_Num, H_Denom, r);
   double H = H_Num / H_Denom;
   return H;
 }
@@ -339,7 +320,7 @@ double calcHGF(array<double,4> kcoords)
   double fpp = 0.0;
   double X, Y, dX_dr, dX_dt, dY_dr, dY_dt;
   static double H;
-  if(r >= BETA)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
+  if(r >= METRIC_GLUE_END_TB)//Friedman Region M(r) = r^3, t0(r) = 1, applies for all r >= 1.2
   {
     X = (pow(3,0.6666666666666666)*pow(r,2)*(1 - t))/(pow(2,0.3333333333333333)*pow(pow(r,6)*(1.0 - t),0.3333333333333333));
     dX_dr = 0.0;
@@ -416,7 +397,7 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
     double z = element[0];
     array<double,2> zw = {z, element[1]};
     array<double,2> rt = KTBTransform2(zw);
-    if(z <= B)//Schwarzschild region, rho <= 0.8
+    if(z <= METRIC_GLUE_START_K)//Schwarzschild region, rho <= 0.8
     {
       H = calcHS(element);
     }
@@ -466,7 +447,7 @@ int main()
 {
   vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
   outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  //vector< array<double,2> > h_vals = calculateH(fGen);
-  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  vector< array<double,2> > h_vals = calculateH(fGen);
+  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
   return 0;
 }
