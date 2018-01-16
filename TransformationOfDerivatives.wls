@@ -15,14 +15,14 @@ U = -Exp[a/4]/et4n;
 V = Exp[a/4]*et4n;
 z = (V-U)/2;
 w = (V+U)/2;
-Print[z/.{rho->0.75,tau->-1.7}];
-Print[w/.{rho->0.75,tau->-1.7}];
+Print[z/.{rho->0.85,tau->-1.7}];
+Print[w/.{rho->0.85,tau->-1.7}];
 dwdrho = D[w, rho];
 dzdrho = D[z,rho];
 dwdz = dwdrho/dzdrho;
-Print[dwdz/.{rho->0.75,tau->-1.7}];
+Print[dwdz/.{rho->0.85,tau->-1.7}];
 d2wdz2 = D[dwdz,rho]/dzdrho;
-Print[d2wdz2/.{rho->0.75,tau->-1.7}];
+Print[d2wdz2/.{rho->0.85,tau->-1.7}];
 
 
 
