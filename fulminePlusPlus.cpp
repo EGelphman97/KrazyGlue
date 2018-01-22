@@ -2,11 +2,9 @@
   University of California, San Diego(UCSD)
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-
   January 15, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
-
-  Version 1.2.3
+  Version 2.0.1
 */
 
 #include <stdio.h>
@@ -434,11 +432,42 @@ void outputToFileH(vector< array<double,2> > h_values)
   fclose(file1);
 }
 
+vector< array<double,2> > euler(double z_start, double z_end, double w_init, double h)
+{
+  double z, z_prev, w_i, w_i_1;
+  int firstflag = 1;
+  vector< array<double,2> > sol;//Vector that holds the ordered pairs (z,w) that represent the numerical solution
+  z = z_start;
+  while(z <= z_end)
+  {
+    if(firstflag)
+    {
+      w_i = w_init;
+      firstflag = 0;
+    }
+    else
+      w_i = w_i_1 + h*(w_i_1 - (z_prev*z_prev) + 1.0);
+    array<double,2> op = {z, w_i};
+    sol.push_back(op);
+    w_i_1 = w_i;//Set w_(i-1)
+    z_prev = z;
+    z += h;//Increment z
+  }
+  return sol;
+}
+
 int main()
 {
-  vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
-  outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
-  vector< array<double,2> > h_vals = calculateH(fGen);
-  outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  //vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
+  //outputToFileF(fGen);//Output 4-tuples (z, f(z) = w, f'(z), f''(z)) to file
+  //vector< array<double,2> > h_vals = calculateH(fGen);
+  //outputToFileH(h_vals);//Output ordered pairs (z, H) to file
+  vector< array<double,2> > sol1 = euler(0.0, 2.0, 0.5, 0.5);
+  int i;
+  printf("Numerical solution of dw/dz = w - z^2 + 1\n");
+  for(i = 0; i < sol1.size(); i++)
+  {
+    printf("z: %lf w: %lf\n", sol1[i][0], sol1[i][1]);
+  }
   return 0;
 }
