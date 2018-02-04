@@ -3,7 +3,7 @@ Eric Gelphman
 University of California San Diego(UCSD)
 Department of Mathematics
 Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-January 1, 2018
+January 16, 2018
 
 KrazyGlue script to numerically solve the mean curvature equation, a nonlinear second order ODE
 Version 1.1.0
@@ -45,10 +45,10 @@ def graphH(list):
     plt.show()
 
 def main():
-    #fList = readFromFile('fGenerator5.txt')
-    #graphF(fList)
-    hList = readFromFile('outputH.txt')
-    graphH(hList)
+    fList = readFromFile('fEvolve.txt')
+    graphF(fList)
+    #hList = readFromFile('outputH.txt')
+    #graphH(hList)
 
 
 if __name__ == "__main__":

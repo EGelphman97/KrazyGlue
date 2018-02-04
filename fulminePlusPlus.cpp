@@ -1,5 +1,5 @@
 /*Eric Gelphman
-  University of California, San Diego(UCSD)
+  University of California San Diego
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
   January 15, 2018
@@ -432,30 +432,7 @@ void outputToFileH(vector< array<double,2> > h_values)
   fclose(file1);
 }
 
-vector< array<double,2> > euler(double z_start, double z_end, double w_init, double h)
-{
-  double z, z_prev, w_i, w_i_1;
-  int firstflag = 1;
-  vector< array<double,2> > sol;//Vector that holds the ordered pairs (z,w) that represent the numerical solution
-  z = z_start;
-  while(z <= z_end)
-  {
-    if(firstflag)
-    {
-      w_i = w_init;
-      firstflag = 0;
-    }
-    else
-      w_i = w_i_1 + h*(w_i_1 - (z_prev*z_prev) + 1.0);
-    array<double,2> op = {z, w_i};
-    sol.push_back(op);
-    w_i_1 = w_i;//Set w_(i-1)
-    z_prev = z;
-    z += h;//Increment z
-  }
-  return sol;
-}
-
+/*
 int main()
 {
   //vector< array<double,4> > fGen = fGeneratorPlusPlus(0.0005, 5000);//fGenerator's Newest Form
@@ -471,3 +448,4 @@ int main()
   }
   return 0;
 }
+*/
