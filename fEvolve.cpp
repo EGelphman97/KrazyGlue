@@ -17,21 +17,26 @@ vector< array<double,4> > finiteDiff2(vector< array<double,4> > fvals)
 {
   int i;
   double h = fvals[1][0] - fvals[0][0];//step size
-  //Calculate first derivative
   for(i = 0; i < fvals.size(); i++)
   {
-    double fp, fpp;
+    double fp, fpp;//First and second derivatives
     if(i < 2)//5-point (4th order) left endpoint finite difference
       fp = (-25.0*fvals[i][1] + 48.0*fvals[i+1][1] - 36.0*fvals[i+2][1] + 16.0*fvals[i+3][1] - 3.0*fvals[i+4][1]) / (12.0*h);
     else if(i >= 2 && i < fvals.size() - 2)//5-point (4th order) midpoint finite difference
     {
       fp = (fvals[i-2][1] - 8.0*fvals[i-1][1] + 8.0*fvals[i+1][1] - fvals[i+2][1]) / (12.0*h);
       fpp = (fvals[i-1][1] - 2.0*fvals[i][1] + fvals[i+1][1]) / (h*h);//3-point (2nd order) for 2nd derivative
+      fvals[i][3] = fpp;
     }
-    else//5-point (4th order) right endpoint finite difference
-      fp = (-25.0*fvals[i][1] + 48.0*fvals[i-1][1] - 36.0*fvals[i-2][1] + 16.0*fvals[i-3][1] - 3.0*fvals[i-4][1]) / (12.0*h);
+    else//backward difference for right endpoints
+    {
+      //printf("Here\n");
+      //printf("z: %lf f: %lf\n", fvals[i][0], fvals[i][1]);
+      fp = (fvals[i][1] - fvals[i-1][1]) / h;
+      //printf("f': %lf\n", fp);
+    }
     fvals[i][2] = fp;
-    fvals[i][3] = fpp;
+    //printf("f': %lf\n", fp);
   }
   //Fill in endpoint values for 2nd derivatives
   fvals[0][3] = (-25.0*fvals[0][2] + 48.0*fvals[1][2] - 36.0*fvals[2][2] + 16.0*fvals[3][2] - 3.0*fvals[4][2]) / (12.0*h);
@@ -42,31 +47,120 @@ vector< array<double,4> > finiteDiff2(vector< array<double,4> > fvals)
   return fvals;
 }
 
+/*Function to calculate the parameters drho/dz, drho/dw, dtau/dz and dtau/dw
+that are needed to calculate the mean curvature flow to evolve f based on then
+sign of the absolute value term
+Parameters: z, w = f(z), sign of absolute value term
+Return: Array of size 4 in this format: {drho/dz, drho/dw, dtau/dz, dtau/dw}
+*/
+array<double,4> calcFlowParameters(double z, double w, char sign)
+{
+  array<double,4> param;
+  double drho_dz, drho_dw, dtau_dz, dtau_dw;
+  //Negative domain for absolute value term
+  if(sign == '-')
+  {
+    drho_dz = (2*((-w - z)/pow(w - z,2) - 1/(w - z))*(w - z))/(-w - z) - (sqrt(2)*exp(1.0)*w*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*LambertW(-(((w - z)*(w + z))/exp(1.0))))/((w - z)*(w + z)*sqrt(w*LambertW(-(((w - z)*(w + z))/exp(1.0))))*(1 +
+              LambertW(-(((w - z)*(w + z))/exp(1.0))))) - (2*exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*sqrt(pow(LambertW(-(((w - z)*(w +
+              z))/exp(1.0))),3)))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*((exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w +
+              z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (exp(1.0)*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w -
+              z)*(w + z)*pow(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+    drho_dw = (2*(-((-w - z)/pow(w - z,2)) - 1/(w - z))*(w - z))/(-w - z) - (2*exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*sqrt(pow(LambertW(-(((w - z)*(w +
+              z))/exp(1.0))),3)))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*((exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (exp(1.0)*(-((w - z)/exp(1.0)) -
+              (w + z)/exp(1.0))*(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w -
+              z)*(w + z)*pow(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (sqrt(2)*(LambertW(-(((w - z)*(w + z))/exp(1.0))) - (exp(1.0)*w*(-((w - z)/exp(1.0)) -
+              (w + z)/exp(1.0))*LambertW(-(((w - z)*(w + z))/exp(1.0))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/sqrt(w*LambertW(-(((w -
+              z)*(w + z))/exp(1.0))));
+    dtau_dz = (2*((-w - z)/pow(w - z,2) - 1/(w - z))*(w - z))/(-w - z) - (sqrt(2)*exp(1.0)*w*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*LambertW(-(((w - z)*(w + z))/exp(1.0))))/((w - z)*(w + z)*sqrt(w*LambertW(-(((w - z)*(w + z))/exp(1.0))))*(1 +
+              LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*((exp(1.0)*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+    dtau_dw = (2*(-((-w - z)/pow(w - z,2)) - 1/(w - z))*(w - z))/(-w - z) + (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*((exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w +
+              z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) + (exp(1.0)*(-((w -
+              z)/exp(1.0)) - (w + z)/exp(1.0))*(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 +
+              LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0))))) +
+              (sqrt(2)*(LambertW(-(((w - z)*(w + z))/exp(1.0))) - (exp(1.0)*w*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*LambertW(-(((w - z)*(w +
+              z))/exp(1.0))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/sqrt(w*LambertW(-(((w - z)*(w + z))/exp(1.0))));
+  }
+  //Positive domain for absolute value term
+  else if(sign == '+')
+  {
+    drho_dz = (2*((-w - z)/pow(w - z,2) - 1/(w - z))*(w - z))/(-w - z) - (2*exp(1.0)*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) -
+              (2*exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*sqrt(pow(LambertW(-(((w - z)*(w + z))/exp(1.0))),3)))/((w - z)*(w + z)*(1 +
+              LambertW(-(((w - z)*(w + z))/exp(1.0))))) - (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(-((exp(1.0)*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))) - (exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+    drho_dw = (2*(-((-w - z)/pow(w - z,2)) - 1/(w - z))*(w - z))/(-w - z) - (2*exp(1.0)*(-((w - z)/exp(1.0)) -
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) -
+              (2*exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*sqrt(pow(LambertW(-(((w - z)*(w + z))/exp(1.0))),3)))/((w - z)*(w + z)*(1 +
+              LambertW(-(((w - z)*(w + z))/exp(1.0))))) - (2*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(-((exp(1.0)*(-((w - z)/exp(1.0)) -
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))) - (exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) +
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+    dtau_dz = (2*((-w - z)/pow(w - z,2) - 1/(w - z))*(w - z))/(-w - z) - (2*exp(1.0)*(-((w - z)/exp(1.0)) +
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) - (2*(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(-((exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))) - (exp(1.0)*(-((w - z)/exp(1.0)) + (w + z)/exp(1.0))*(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+    dtau_dw = (2*(-((-w - z)/pow(w - z,2)) - 1/(w - z))*(w - z))/(-w - z) - (2*exp(1.0)*(-((w - z)/exp(1.0)) -
+              (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/((w - z)*(w + z)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0))))) - (2*(sqrt(2) -
+              sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(-((exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))*(1 + LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))) - (exp(1.0)*(-((w - z)/exp(1.0)) - (w + z)/exp(1.0))*(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))))*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))))/(sqrt(2)*(w - z)*(w + z)*pow(sqrt(2) - sqrt(2)*sqrt(LambertW(-(((w - z)*(w +
+              z))/exp(1.0)))),2)*(1 + LambertW(-(((w - z)*(w + z))/exp(1.0)))))))/(sqrt(2) + sqrt(2)*sqrt(LambertW(-(((w - z)*(w + z))/exp(1.0)))));
+  }
+  param[0] = drho_dz;
+  param[1] = drho_dw;
+  param[2] = dtau_dz;
+  param[3] = dtau_dw;
+  return param;
+}
+
 /*Function to transform vector of 4-tuples (z, f(z) = w, f'(z), f''(z)) in Kruskal coordinates to
 a vector of 4-tuples (rho, g(rho) = tau, g'(rho), g''(rho)) in Tolman-Bondi coordinates in the
-Glue and Friedman regions of the metric
+Glue and Friedman regions of the metric. int parameter idx is the index at which the main iteration loop starts,
+as it is not necessary to calculate g for z-vlaues < this value
 */
-vector< array<double,4> > gGenerator(vector< array<double,4> > f)
+vector< array<double,4> > gGenerator(vector< array<double,4> > f, int idx)
 {
   vector< array<double,4> > g;//Values of (rho, g(rho) = tau, g'(rho), g''(rho))
   int i;
-  for(i = 0; i < f.size(); i++)
+  for(i = idx; i < f.size(); i++)
   {
     array<double,2> zw = {f[i][0], f[i][1]};
     array<double,2> rhotau = KTBTransform2(zw);
-    if(rhotau[0] >= BETA)//Glue and Friedman regions of metric
-    {
-      array<double,4> gElement = {rhotau[0], rhotau[1], 0.0, 0.0};
-      g.push_back(gElement);
-    }
+    array<double,4> gElement = {rhotau[0], rhotau[1], 0.0, 0.0};
+    g.push_back(gElement);
   }
-  g = finiteDiff2(g);
+  g = finiteDiff2(g);//Finite-difference differentiation
   return g;
 }
 
 /*Function to calculate the mean curvature H in the Gluing and Friedman region from
   4-tuple (z, f(z) = w, f'(z), f''(z)) represented by kcoords*/
-double calcHGF2(array<double,4> tbcoords)
+array<double,2> calcHGF2(array<double,4> tbcoords)
 {
   double r = tbcoords[0];
   double t = tbcoords[1];
@@ -125,66 +219,77 @@ double calcHGF2(array<double,4> tbcoords)
   }
   double H_Num = (2.0*pow(fp,3)*dY_dr) - (pow(X,3)*Y*dX_dt) + ((X*Y*fp)*(dX_dr + 2*fp*dX_dt)) - (2.0*pow(X,4)*dY_dt) -(pow(X,2)*((Y*fpp)+(2.0*fp)*(dY_dr - fp*dY_dt)));
   H = H_Num / H_Denom;
-  return H;
-}
-
-/*Function to calculate the mean curvature H for all three regions
-Returns a vector that stores the values of H as well as their corresponding z-values
-The ordered pair (z, H) is represented by an array of size 2*/
-vector< array<double,2> > calculateH2(vector< array<double,4> > fVals)
-{
-  vector< array<double,2> > hValues;
-  vector< array<double,4> > gVals = gGenerator(fVals);
-  int i;
-  int i_g_start = fVals.size() - gVals.size();//Where the gluing region of the metric starts
-  double H;
-  for(i = 0; i < fVals.size(); i++)
-  {
-    array<double,4> fElement = fVals[i];
-    if(i < i_g_start)//Schwarzschild region, rho <= 0.75
-      H = calcHS(fElement);
-    else//Glue and Friedman Regions
-    {
-      array<double,4> gElement = gVals[i - i_g_start];
-      H = calcHGF2(gElement);
-    }
-    array<double,2> nElem = {fElement[0], H};//Build ordered pair
-    hValues.push_back(nElem);//Append ordered pair to vector
-  }
-  return hValues;
+  array<double,2> result = {H, X};
+  return result;
 }
 
 /*Function to perform the evolution for each new evolved f
 Paramters: fvals = previous f (as set of 4-tuples (z, w = f(z), f'(z), f''(z))) that was evolved
-           Hvals = values of (z, H) calculated using previous f Values
 Return: vector of arrays of size 4 representing the 4-tuples (z, f(z) = w, f'(z), f''(z)) of the newly evolved f
 */
-vector< array<double,4> > evolve_step(vector< array<double,4> > fvals, vector< array<double,2> > Hvals)
+vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
 {
   vector< array<double,4> > f_next;//evolved f
   int i;
+  vector< array<double,4> > gVals;
+  int firstFlag = 1;
   for(i = 0; i < fvals.size(); i++)
   {
-    double w_next;//What is being calculated, the next evolved value of f(z)
+    double w_next, H, df_ds;//What is being calculated, the next evolved value of f(z), mean curvature H, term for Euler's method, respectively
     array<double,4> f_cur_element = fvals[i];
     double z_cur = f_cur_element[0];//current z value
     double f_cur = f_cur_element[1];//current value of f
     double fp_cur = f_cur_element[2];//f'(z) at z = z_cur
-    double r = 2*LambertW(((z_cur*z_cur) - (f_cur*f_cur)) / exp(1.0)) + 2.0;
+    double r = 2*LambertW(((z_cur*z_cur) - (f_cur*f_cur)) / exp(1.0)) + 2.0;//Necessary parameters
     double alpha = 1.0 / sqrt((32.0 / r)*exp(-r/2.0));
-    double df_ds = (alpha/sqrt(1.0 - (fp_cur*fp_cur))) - sqrt(((alpha*alpha)/(1 - (fp_cur*fp_cur))) - 1.0);
     array<double,2> zw = {z_cur, f_cur};
-    array<double,2> rt = KTBTransform2(zw);
-    printf("rho: %lf\n", rt[0]);
-    w_next = f_cur + (TIME_STEP*Hvals[i][1]*df_ds);//step for Euler's method
+    array<double,2> rhotau = KTBTransform2(zw);
+    if(rhotau[0] < BETA)//Scwarzschild Metric
+    {
+      H = calcHS(f_cur_element);
+      df_ds = H*alpha*sqrt(1.0 - fp_cur);
+    }
+    else//Glue and Friedman Metric
+    {
+      double fpsqr = fp_cur*fp_cur;//Important parameter
+      if(fpsqr >= 1.0)//Error handling
+      {
+        printf("Error! f'(z) >= 1\n");
+        printf("z: %lf f: %lf f': %lf\n", z_cur, f_cur, fp_cur);
+        exit(1);
+      }
+      double i_g_start;
+      if(firstFlag)//First time through
+      {
+        i_g_start = i;//Start of when (rho, g(rho), g'(rho), g''(rho)) needs to be calculated
+        vector< array<double,4> > gVals = gGenerator(fvals, i);//First time, calculate values of (rho, g(rho) = tau, g'(rho), g''(rho))
+        firstFlag = 0;//Not first time
+      }
+      array<double,4> gElement = gVals[i - i_g_start];
+      array<double,2> hx = calcHGF2(gElement);//Calcuate H and X
+      H = hx[0];
+      double X = hx[1];
+      char sign;//Sign of abolsute value term, needed to calculate flow parameters
+      double absTerm = (sqrt(2.0) + sqrt(r)) / (sqrt(2) - sqrt(r));
+      if(absTerm >= 0)
+        sign = '+';
+      else
+        sign = '-';
+      array<double,4> param = calcFlowParameters(z_cur, f_cur, sign);//Calculate partial derivative flow parameters
+      double masqr, b, csqr;
+      masqr = -1.0*pow(param[3], 2) + X*X*pow(param[1], 2);
+      b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
+      csqr = -1.0*pow(param[2],2) + X*X*pow(param[1],2);
+      df_ds = H*sqrt((csqr + 2*b*fp_cur + masqr*fpsqr) / (b*b - masqr*csqr));//Calculate df_ds for this metric
+    }
+    w_next = f_cur + TIME_STEP*df_ds;//step for Euler's method
+    //printf("f: %lf f_cur: %lf H: %lf df/ds: %lf\n", w_next, f_cur, Hvals[i][1], df_ds);
     array<double,4> f_next_element = {z_cur, w_next, 0.0, 0.0};
-    f_next.push_back(f_next_element);
+    f_next.push_back(f_next_element);//Append to vector
   }
-  f_next = finiteDiff2(f_next);
+  f_next = finiteDiff2(f_next);//Finite-difference differentiation
   return f_next;
 }
-
-
 
 /*Function to perform the evolution
   Parameters: num_evol = number of evolutions to be performed
@@ -193,19 +298,17 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals, vector< a
 vector< array<double,4> > evolve(int num_evol)
 {
   int i = 0;
-  vector< array<double,4> > evolved_f;//values of (z, f(z) = w, f'(z), f''(z))
-  vector< array<double,2> > Hvals;//values of (z, H)
+  vector< array<double,4> > evolved_f;//Values of (z, f(z) = w, f'(z), f''(z)
   for(i = 0; i < num_evol; i++)
   {
+    printf("idx: %i\n", i);
     if(i == 0)//First step is to do fGenerator to establish initial approximation
     {
       evolved_f = fGeneratorPlusPlus(0.0005, 5000);
-      Hvals = calculateH(evolved_f);
     }
     else//General case
     {
-      Hvals = calculateH(evolved_f);
-      evolved_f = evolve_step(evolved_f, Hvals);
+      evolved_f = evolve_step(evolved_f);//Now that values of H are known, evolve f
     }
   }
   return evolved_f;
