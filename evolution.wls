@@ -4,7 +4,7 @@
 ClearAll[format1]
 format1 = RawBoxes[Replace[ToBoxes@#, InterpretationBox[a_, b_, c___] :>
       With[{aa = StringReplace[a, 
-            { "Sqrt" -> "sqrt", "Power(E," -> "exp(", "Power" -> "pow", "ProductLog" -> "LambertW", "E" -> "exp(1.0)"}]}, aa], 
+            { "Sqrt" -> "sqrt", "Power(E," -> "exp(", "Power" -> "pow", "ProductLog" -> "LambertW", "(-Power(w,2) + Power(z,2))/E" -> "a", "E" -> "exp(1.0)"}]}, aa], 
       {0, Infinity}]] &;
 U = w-z;
 V = w+z;
@@ -24,14 +24,14 @@ dtaudz = D[tau,z];
 dmtaudz = D[mtau,z];
 dtaudw = D[tau,w];
 dmtaudw = D[mtau,w];
-Print[format1@CForm[drhodz]];
-Print[format1@CForm[dmrhodz]];
-Print[format1@CForm[drhodw]];
-Print[format1@CForm[dmrhodw]];
-Print[format1@CForm[dtaudz]];
-Print[format1@CForm[dmtaudz]];
-Print[format1@CForm[dtaudw]];
-Print[format1@CForm[dmtaudw]];
+Print[format1@CForm[Simplify[drhodz]]];
+Print[format1@CForm[Simplify[dmrhodz]]];
+Print[format1@CForm[Simplify[drhodw]]];
+Print[format1@CForm[Simplify[dmrhodw]]];
+Print[format1@CForm[Simplify[dtaudz]]];
+Print[format1@CForm[Simplify[dmtaudz]]];
+Print[format1@CForm[Simplify[dtaudw]]];
+Print[format1@CForm[Simplify[dmtaudw]]];
 
 
 
