@@ -210,6 +210,7 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
         firstFlag = 0;//Not first time anymore
       }
       array<double,4> gElement = gVals[i - i_g_start];
+      //printf("rho: %lf g(rho): %lf\n", gElement[0], gElement[1]);
       array<double,2> hx = calcHGF2(gElement);//Calcuate H and X
       H = hx[0];
       double X = hx[1];
@@ -231,10 +232,10 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
       csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
       if(i >= fvals.size() - 2)
         b = -b;
-      df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
-      //printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
+      df_ds = H*sqrt((csqr + 2.0*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
       //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
     }
+    //printf("z: %lf df/ds: %lf\n", z_cur, df_ds);
     w_next = f_cur + TIME_STEP*df_ds;//Step for Euler's method
     array<double,4> f_next_element = {z_cur, w_next, 0.0, 0.0};
     f_next.push_back(f_next_element);//Append to vector
@@ -253,7 +254,8 @@ vector< array<double,4> > evolve(int num_evol)
   vector< array<double,4> > evolved_f;//Values of (z, f(z) = w, f'(z), f''(z)
   for(i = 0; i < num_evol; i++)
   {
-    printf("idx: %i\n", i);
+    if(i % 10 == 0)
+      printf("idx: %i\n", i);
     if(i == 0)//First step is to do fGenerator to establish initial approximation
     {
       evolved_f = fGeneratorPlusPlus(0.0005, 5000);
@@ -266,101 +268,9 @@ vector< array<double,4> > evolve(int num_evol)
   return evolved_f;
 }
 
-/*Function to perform the evolution for each new evolved f
-Paramters: fvals = previous f (as set of 4-tuples (z, w = f(z), f'(z), f''(z))) that was evolved
-Return: vector of arrays of size 4 representing the 4-tuples (z, f(z) = w, f'(z), f''(z)) of the newly evolved f
-*/
-vector< array<double,2> > evolve_stepD(vector< array<double,4> > fvals)
-{
-  vector< array<double,2> > dfVals;
-  int i;
-  vector< array<double,4> > gVals;
-  int firstFlag = 1;
-  double i_g_start;
-  for(i = 0; i < fvals.size(); i++)
-  {
-    double w_next, H, df_ds;//What is being calculated, the next evolved value of f(z), mean curvature H, term for Euler's method, respectively
-    array<double,4> f_cur_element = fvals[i];
-    double z_cur = f_cur_element[0];//current z value
-    double f_cur = f_cur_element[1];//current value of f
-    double fp_cur = f_cur_element[2];//f'(z) at z = z_cur
-    //printf("z: %lf f: %lf f': %lf\n", z_cur, f_cur, fp_cur);
-    double r = 2*LambertW(((z_cur*z_cur) - (f_cur*f_cur)) / exp(1.0)) + 2.0;//Necessary parameters
-    double alpha = 1.0 / sqrt((32.0 / r)*exp(-r/2.0));
-    array<double,2> zw = {z_cur, f_cur};
-    array<double,2> rhotau = KTBTransform2(zw);
-    if(rhotau[0] < BETA)//Scwarzschild Metric
-    {
-
-      H = calcHS(f_cur_element);
-      df_ds = H*alpha*sqrt(1.0 - fp_cur*fp_cur);
-    }
-    else//Glue and Friedman Metric
-    {
-      double fpsqr = fp_cur*fp_cur;//Important parameter
-      if(firstFlag)//First time through
-      {
-        i_g_start = i;//Start of when (rho, g(rho), g'(rho), g''(rho)) needs to be calculated
-        gVals = gGenerator(fvals, i);//First time, calculate values of (rho, g(rho) = tau, g'(rho), g''(rho)
-        //printf("Error does not occur in calculating g\n");
-        firstFlag = 0;//Not first time anymore
-      }
-      array<double,4> gElement = gVals[i - i_g_start];
-      array<double,2> hx = calcHGF2(gElement);//Calcuate H and X
-      H = hx[0];
-      double X = hx[1];
-      char sign;//Sign of abolsute value term, needed to calculate flow parameters
-      double absTerm = (sqrt(2.0) + sqrt(r)) / (sqrt(2) - sqrt(r));
-      if(absTerm >= 0)
-        sign = '+';
-      else
-        sign = '-';
-      array<double,4> param = calcFlowParameters(z_cur, f_cur, sign);//Calculate partial derivative flow parameters
-      if(isnan(param[0]) || isnan(param[1]) || isnan(param[2]) || isnan(param[3]))
-      {
-        printf("Error! nan thrown!\n");
-        printf(" %lf %lf %lf %lf\n", param[0], param[1], param[2], param[3]);
-      }
-      double asqr, b, csqr;
-      asqr = pow(param[3], 2) - X*X*pow(param[1], 2);
-      b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
-      csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
-      if(i >= fvals.size() - 2)
-        b = -b;
-      df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
-      //printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
-      //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
-    }
-    array<double,2> next_element = {z_cur, df_ds};
-    dfVals.push_back(next_element);//Append to vector
-  }
-  return dfVals;
-}
-
-/*Function to perform the evolution
-  Parameters: num_evol = number of evolutions to be performed
-  Return: final evolved f after num_evol evolutions
-*/
-vector< array<double,2> > evolveD(int num_evol)
-{
-  int i = 0;
-  vector< array<double,4> > f0;//Values of (z, f(z) = w, f'(z), f''(z)
-  vector< array<double,2> > dfVals;
-  f0 = fGeneratorPlusPlus(0.0005, 5000);
-  dfVals = evolve_stepD(f0);
-  for(i = 0; i < num_evol; i++)
-  {
-    if(i == 0)
-    {
-
-    }
-  }
-  return dfVals;
-}
-
 int main()
 {
-  int numEvolutions = 700;
+  int numEvolutions = 2000;
   vector< array<double,4> > f_test = evolve(numEvolutions);
   vector< array<double,2> > hv = calculateH(f_test);
   outputToFile2(hv);
