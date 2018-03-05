@@ -2,15 +2,15 @@
   University of California San Diego
   Department of Mathematics
   Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-  February 1, 2018
+  February 3, 2018
   fulminePlusPlus, a C++ extension that performs all mathematical and file I/0 operations for KG2
-  Version 2.1.0
+  Version 2.1.1
 */
 
 #include <stdio.h>
 #include <iostream>
-#include <vector>//std::vector
-#include <array>//std::array
+#include <vector>
+#include <array>
 #include <cmath>
 using namespace std;
 
@@ -69,17 +69,28 @@ double LambertW(const double z) {
 }
 
 /*Helper function to tranfrom an input ordered pair (z, f(z) = w) in Kruskal coordinates to
-an output 4-tuple (rho, g(rho) = tau) in Tolman-Bondi Coordinates*/
+an output ordered pair (rho, g(rho) = tau) in Tolman-Bondi Coordinates*/
 array<double,2> KTBTransform2(array<double,2> vals)
 {
   double z = vals[0];
   double w = vals[1];//f(z)
+  //printf("z: %lf w: %lf\n", z, w);
   double U = w - z;//U = w - z
   double V = w + z;//V = w + z
   double t = 2.0*log(-V / U);
+  if(isnan(U) || isnan(V))
+  {
+    cout << "Error! nan Thrown!\n";
+    printf("z: %lf w: %lf\n", z, w);
+  }
   double r = 2.0*LambertW((-U*V) / exp(1)) + 2.0;
   double tau = 2.0*sqrt(2.0)*sqrt(r) + t - 2.0*log(fabs((sqrt(2.0) + sqrt(r))/(sqrt(2.0) - sqrt(r))));
   double rho = tau + sqrt((2.0/9.0)*pow(r,3));
+  if(isnan(rho) || isnan(tau))
+  {
+    rho = -HUGE_VAL;
+    tau = -HUGE_VAL;
+  }
   array<double,2> result = {rho, tau};
   return result;
 }
@@ -165,9 +176,11 @@ double interpolate(double key, vector< array<double,2> > vals)
   return val;
 }
 
-/*Function to generate a vector of ordered pairs(implemented as arrays of size 2) (z, w)
+/*Function to generate a vector of ordered pairs(implemented as arrays of size 2 (z, w)
 with an even z-step given by the value of the variable z_step. Variable nPoints
-is needed for the initial generation of rho-values*/
+is needed for the initial generation of rho-values.
+Note: This is the function that calculates z and f(z) = w
+*/
 vector< array<double,2> > getConstZStep(double z_step, int nPoints)
 {
   vector< array<double,2> > result;
@@ -209,12 +222,15 @@ vector< array<double,2> > getConstZStep(double z_step, int nPoints)
     }
     z += z_step;
   }
+  result.pop_back();
   return result;
 }
 
 /*Function to compute the transfromation T: (rho, g(rho) = tau, g'(rho), g''(rho)) |--> (z, f(z) = w, f'(z), f''(z))
 Returns a vector of arrays of size 4, with the array of size 4 representing the 4-tuple (z, f(z) = w, f'(z), f''(z))
-Parameters: step_size is the constant z-step, nPoints is a paramter necessary to generate values of (rho, tau)*/
+Parameters: step_size is the constant z-step, nPoints is a paramter necessary to generate values of (rho, tau)
+Note: This is the function thatv calculates f' and f''
+*/
 vector< array<double,4> > TBKTransform(double z_step, int nPoints)
 {
   vector< array<double,2> > constZStep = getConstZStep(z_step, nPoints);//Transform (rho, g(rho)) |--> (z, f(z))
@@ -227,6 +243,7 @@ vector< array<double,4> > TBKTransform(double z_step, int nPoints)
     array<double,4> element;
     double z = constZStep[i][0];
     double w = constZStep[i][1];
+
     double fp, fpp;//f'(z), f''(z)
     if(i < 2)//First 2 points
     {
@@ -402,31 +419,45 @@ vector< array<double,2> > calculateH(vector< array<double,4> > fVals)
 }
 
 /*Function to output the numerical data from fGeneratorPlusPlus to a file*/
-void outputToFileF(vector< array<double,4> > fGen)
+void outputToFile4(vector< array<double,4> > vals)
 {
   FILE* file1;
-  file1 = fopen("fGenerator5.txt", "w");
+  file1 = fopen("fEvolve.txt", "w");
   int i;
-  for(i = 0; i < fGen.size(); i++)
+  for(i = 0; i < vals.size(); i++)
   {
-      array<double,4> element = fGen[i];
-      /*Print formatted string in this format: z f(z) = w f'(z) f''(z) where each
-      value is separated by a space*/
-      fprintf(file1, "%.15lf %.15lf %.15lf %.15lf\n", element[0], element[1], element[2], element[3]);
+      array<double,4> element = vals[i];
+      //Print formatted string in this format: z f(z) where each value is separated by a space
+      fprintf(file1, "%.15lf %.15lf\n", element[0], element[1]);
   }
   fclose(file1);
 }
 
-/*Function to output the numerical data from calculateH to a file*/
-void outputToFileH(vector< array<double,2> > h_values)
+/*Function to output the numerical data to a file to then graph in Python*/
+void outputToFile2(vector< array<double,2> > vals)
 {
   FILE* file1;
   file1 = fopen("outputH.txt", "w");
   int i;
-  for(i = 0; i < h_values.size(); i++)
+  for(i = 0; i < vals.size(); i++)
   {
-      array<double,2> element = h_values[i];
-      /*Print formatted string in this format: z H where z and H are separated by a space*/
+      array<double,2> element = vals[i];
+      //Print formatted string in this format: z H where z and H are separated by a space
+      fprintf(file1, "%.15lf %.15lf\n", element[0], element[1]);
+  }
+  fclose(file1);
+}
+
+/*Function to output the numerical data to a file to then graph in Python*/
+void outputToFile2B(vector< array<double,2> > vals)
+{
+  FILE* file1;
+  file1 = fopen("fEvolve.txt", "w");
+  int i;
+  for(i = 0; i < vals.size(); i++)
+  {
+      array<double,2> element = vals[i];
+      //Print formatted string in this format: z H where z and H are separated by a space
       fprintf(file1, "%.15lf %.15lf\n", element[0], element[1]);
   }
   fclose(file1);

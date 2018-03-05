@@ -3,47 +3,48 @@ Eric Gelphman
 University of California San Diego(UCSD)
 Department of Mathematics
 Irwin and Joan Jacobs School of Engineering Department of Electrical and Computer Engineering(ECE)
-February 3, 2018
-Version 1.2.0
+February 25, 2018
+Version 1.4.0
 */
 
 #include "fulminePlusPlus2.hpp"
 using namespace std;
 
 double TIME_STEP = 1.0e-04;
+double EP2 = 1.0e-08;
 
-//Function to calculate the first and second derivatives of a function 5 using finite-difference method
+//Function to calculate the first and second derivatives of a function using finite-difference method
 vector< array<double,4> > finiteDiff2(vector< array<double,4> > fvals)
 {
   int i;
   double h = fvals[1][0] - fvals[0][0];//step size
-  for(i = 0; i < fvals.size(); i++)
+  int end = fvals.size() - 1;//Last index in vector
+  vector< array<double,4> > newF;
+  for(i = 0; i <= end; i++)
   {
-    double fp, fpp;//First and second derivatives
-    if(i < 2)//5-point (4th order) left endpoint finite difference
-      fp = (-25.0*fvals[i][1] + 48.0*fvals[i+1][1] - 36.0*fvals[i+2][1] + 16.0*fvals[i+3][1] - 3.0*fvals[i+4][1]) / (12.0*h);
-    else if(i >= 2 && i < fvals.size() - 2)//5-point (4th order) midpoint finite difference
+    newF[i][0] = fvals[i][0];
+    newF[i][1] = fvals[i][1];
+    if(i >= 2 && i <= end - 2)
     {
-      fp = (fvals[i-2][1] - 8.0*fvals[i-1][1] + 8.0*fvals[i+1][1] - fvals[i+2][1]) / (12.0*h);
-      fpp = (fvals[i-1][1] - 2.0*fvals[i][1] + fvals[i+1][1]) / (h*h);//3-point (2nd order) for 2nd derivative
-      fvals[i][3] = fpp;
+        newF[i][2] = (fvals[i-2][1] - 8.0*fvals[i-1][1] + 8.0*fvals[i+1][1] - fvals[i+2][1]) / (12.0*h);//4th order midpoint for 1st derivative
+        newF[i][3] = (1.0 / (h*h))*(fvals[i-1][1] - 2.0*fvals[i][1] + fvals[i+1][1]);//3rd order midpoint for 2nd derivative
     }
-    else//backward difference for right endpoints
-    {
-      //printf("Here\n");
-      //printf("z: %lf f: %lf\n", fvals[i][0], fvals[i][1]);
-      fp = (fvals[i][1] - fvals[i-1][1]) / h;
-      //printf("f': %lf\n", fp);
-    }
-    fvals[i][2] = fp;
-    //printf("f': %lf\n", fp);
   }
-  //Fill in endpoint values for 2nd derivatives
-  fvals[0][3] = (-25.0*fvals[0][2] + 48.0*fvals[1][2] - 36.0*fvals[2][2] + 16.0*fvals[3][2] - 3.0*fvals[4][2]) / (12.0*h);
-  fvals[1][3] = (-25.0*fvals[1][2] + 48.0*fvals[2][2] - 36.0*fvals[3][2] + 16.0*fvals[4][2] - 3.0*fvals[5][2]) / (12.0*h);
-  int end = fvals.size() - 1;
-  fvals[end-1][3] = (-25.0*fvals[end-1][2] + 48.0*fvals[end-2][2] - 36.0*fvals[end-3][2] + 16.0*fvals[end-4][2] - 3.0*fvals[end-5][2]) / (12.0*h);
-  fvals[end][3] = (-25.0*fvals[end][2] + 48.0*fvals[end-1][2] - 36.0*fvals[end-2][2] + 16.0*fvals[i-3][2] - 3.0*fvals[i-4][2]) / (12.0*h);
+  //Construct linear approximation to second derivative at left endpoint
+  double m3l, m3r, bl, br;
+  m3l = (newF[3][3] - newF[2][3]) / h;//slope
+  bl = newF[3][3] - m3l*newF[3][0];//y-intercept
+  newF[1][3] = m3l*newF[1][0] + bl;
+  newF[0][3] = m3l*newF[0][0] + bl;
+  newF[1][2] = 0.5*m3l*pow(newF[1][0],2) + bl*newF[1][0];//Integrate to get the first derivative
+  newF[0][2] = 0.5*m3l*pow(newF[0][0],2) + bl*newF[0][0];
+  //Construct linear approximation to second derivative at right endpoint
+  m3r = (newF[end-2][3] - newF[end-3][3]) / h;//slope
+  br = newF[end-2][3] - m3r*newF[end-2][0];//y-intercept
+  newF[end-1][3] = m3r*newF[end-1][0] + br;
+  newF[end][3] = m3r*newF[end][0] + br;
+  newF[end-1][2] = 0.5*m3r*pow(newF[end-1][0],2) + br*newF[end-1][0];//Integrate to get the first derivative
+  newF[end][2] = 0.5*m3r*pow(newF[end][0],2) + br*newF[end][0];
   return fvals;
 }
 
@@ -67,32 +68,24 @@ array<double,4> calcFlowParameters(double z, double w, char sign)
   //Negative domain for absolute value term
   if(sign == '-')
   {
-    drho_dz = (-4*z*sqrt(LambertW(a))*sqrt(abs(w*LambertW(a))) + w*pow(LambertW(a),2)*(-2*sqrt(2)*z + 4*sqrt(abs(w*LambertW(a)))) - 4*sqrt(abs(w*LambertW(a)))*(w - z*sqrt(pow(LambertW(a),3))) +
-              LambertW(a)*(2*sqrt(2)*w*z - 4*z*sqrt(abs(w*LambertW(a)))*sqrt(pow(LambertW(a),3))))/((pow(w,2) - pow(z,2))*sqrt(abs(w*LambertW(a)))*(-1 + pow(LambertW(a),2)));
-    drho_dw = (sqrt(2)*(pow(w,2) - pow(z,2))*pow(LambertW(a),3) + 4*w*sqrt(LambertW(a))*sqrt(abs(w*LambertW(a))) + 2*pow(LambertW(a),2)*(sqrt(2)*pow(w,2) -
-              2*z*sqrt(abs(w*LambertW(a)))) + 4*sqrt(abs(w*LambertW(a)))*(z - w*sqrt(pow(LambertW(a),3))) + LambertW(a)*(-3*sqrt(2)*pow(w,2) + sqrt(2)*pow(z,2) +
-              4*w*sqrt(abs(w*LambertW(a)))*sqrt(pow(LambertW(a),3))))/((pow(w,2) - pow(z,2))*sqrt(abs(w*LambertW(a)))*(-1 + pow(LambertW(a),2)));
-    dtau_dz = (2*sqrt(2)*w*z*LambertW(a) - 4*w*sqrt(abs(w*LambertW(a))) - 4*z*sqrt(LambertW(a))*sqrt(abs(w*LambertW(a))) + w*pow(LambertW(a),2)*(-2*sqrt(2)*z +
-              4*sqrt(abs(w*LambertW(a)))))/((pow(w,2) - pow(z,2))*sqrt(abs(w*LambertW(a)))*(-1 + pow(LambertW(a),2)));
-    dtau_dw = (sqrt(2)*(-3*pow(w,2) + pow(z,2))*LambertW(a) + sqrt(2)*(pow(w,2) - pow(z,2))*pow(LambertW(a),3) + 4*z*sqrt(abs(w*LambertW(a))) +
-              4*w*sqrt(LambertW(a))*sqrt(abs(w*LambertW(a))) + 2*pow(LambertW(a),2)*(sqrt(2)*pow(w,2) - 2*z*sqrt(abs(w*LambertW(a)))))/((pow(w,2) -
-              pow(z,2))*sqrt(abs(w*LambertW(a)))*(-1 + pow(LambertW(a),2)));
+    drho_dz = (4*(w - z/sqrt(1 + LambertW(a)) - (z*LambertW(a))/sqrt(pow(1 + LambertW(a),3)) - (z*pow(LambertW(a),2))/sqrt(pow(1 + LambertW(a),3))))/(pow(w,2) - pow(z,2));
+    drho_dw = (4*(-z + w/sqrt(1 + LambertW(a)) + (w*LambertW(a))/sqrt(pow(1 + LambertW(a),3)) + (w*pow(LambertW(a),2))/sqrt(pow(1 + LambertW(a),3))))/(pow(w,2) - pow(z,2));
+    dtau_dz = (4*(w - z/sqrt(1 + LambertW(a))))/(pow(w,2) - pow(z,2));
+    dtau_dw = (4*(-z + w/sqrt(1 + LambertW(a))))/(pow(w,2) - pow(z,2));
   }
   //Positive domain for absolute value term
   else if(sign == '+')
   {
-    drho_dz = 4*(-w - z*pow(LambertW(a),1.5) + w*pow(LambertW(a),2) + z*sqrt(pow(LambertW(a),3)) -
-              z*LambertW(a)*sqrt(pow(LambertW(a),3)))/((pow(w,2) - pow(z,2))*(-1 + pow(LambertW(a),2)));
-    drho_dw = (4*(z + w*pow(LambertW(a),1.5) - z*pow(LambertW(a),2) - w*sqrt(pow(LambertW(a),3)) + w*LambertW(a)*sqrt(pow(LambertW(a),3))))/((pow(w,2) -
-              pow(z,2))*(-1 + pow(LambertW(a),2)));
-    dtau_dz = (4*(-w - z*pow(LambertW(a),1.5) + w*pow(LambertW(a),2)))/((pow(w,2) - pow(z,2))*(-1 + pow(LambertW(a),2)));
-    dtau_dw = (4*(z + w*pow(LambertW(a),1.5) - z*pow(LambertW(a),2)))/((pow(w,2) - pow(z,2))*(-1 + pow(LambertW(a),2)));
+    drho_dz = (4*(w - z/sqrt(1 + LambertW(a)) - (z*LambertW(a))/sqrt(pow(1 + LambertW(a),3)) - (z*pow(LambertW(a),2))/sqrt(pow(1 + LambertW(a),3))))/(pow(w,2) - pow(z,2));
+    drho_dw = (4*(-z + w/sqrt(1 + LambertW(a)) + (w*LambertW(a))/sqrt(pow(1 + LambertW(a),3)) + (w*pow(LambertW(a),2))/sqrt(pow(1 + LambertW(a),3))))/(pow(w,2) - pow(z,2));
+    dtau_dz = (4*(w - z/sqrt(1 + LambertW(a))))/(pow(w,2) - pow(z,2));
+    dtau_dw = (4*(-z + w/sqrt(1 + LambertW(a))))/(pow(w,2) - pow(z,2));
   }
   param[0] = drho_dz;
   param[1] = drho_dw;
   param[2] = dtau_dz;
   param[3] = dtau_dw;
-  printf("sign: %c param[0]: %lf param[1]: %lf param[2]: %lf param[3]: %lf\n", sign, drho_dz, drho_dw, dtau_dz, dtau_dw);
+  //printf("sign: %c param[0]: %lf param[1]: %lf param[2]: %lf param[3]: %lf\n", sign, drho_dz, drho_dw, dtau_dz, dtau_dw);
   return param;
 }
 
@@ -112,8 +105,9 @@ vector< array<double,4> > gGenerator(vector< array<double,4> > f, int idx)
     array<double,4> gElement = {rhotau[0], rhotau[1], 0.0, 0.0};
     g.push_back(gElement);
   }
-  g = finiteDiff2(g);//Finite-difference differentiation
-  return g;
+  vector< array<double,4> > newG;
+  newG = finiteDiff2(g);//Finite-difference differentiation
+  return newG;
 }
 
 /*Function to calculate the mean curvature H in the Gluing and Friedman region from
@@ -208,17 +202,11 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
     {
 
       H = calcHS(f_cur_element);
-      df_ds = H*alpha*sqrt(1.0 - fp_cur);
+      df_ds = H*alpha*sqrt(1.0 - fp_cur*fp_cur);
     }
     else//Glue and Friedman Metric
     {
       double fpsqr = fp_cur*fp_cur;//Important parameter
-      if(fpsqr >= 1.0)//Error handling
-      {
-        printf("Error! f'(z) >= 1\n");
-        printf("z: %lf f: %lf f': %lf\n", z_cur, f_cur, fp_cur);
-        exit(1);
-      }
       if(firstFlag)//First time through
       {
         i_g_start = i;//Start of when (rho, g(rho), g'(rho), g''(rho)) needs to be calculated
@@ -242,17 +230,15 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
         printf("Error! nan thrown!\n");
         printf(" %lf %lf %lf %lf\n", param[0], param[1], param[2], param[3]);
       }
-      double masqr, b, csqr;
-      masqr = -pow(param[3], 2) + X*X*pow(param[1], 2);
+      double asqr, b, csqr;
+      asqr = pow(param[3], 2) - X*X*pow(param[1], 2);
       b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
-      csqr = -1.0*pow(param[2],2) + X*X*pow(param[1],2);
-      df_ds = H*sqrt((csqr + 2*b*fp_cur + masqr*fpsqr) / (b*b - masqr*csqr));//Calculate df_ds for this metric
+      csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
+      df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
       //printf("term: %lf\n", (csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));
-      printf("df_ds: %lf\n", df_ds);
+      //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
     }
-    w_next = f_cur + TIME_STEP*df_ds;//step for Euler's method
-    printf("z: %lf w_next: %lf\n", z_cur, w_next);
-    //printf("f: %lf f_cur: %lf H: %lf df/ds: %lf\n", w_next, f_cur, Hvals[i][1], df_ds);
+    w_next = f_cur + TIME_STEP*df_ds;//Step for Euler's method
     array<double,4> f_next_element = {z_cur, w_next, 0.0, 0.0};
     f_next.push_back(f_next_element);//Append to vector
   }
@@ -283,9 +269,92 @@ vector< array<double,4> > evolve(int num_evol)
   return evolved_f;
 }
 
+/*Function to perform the evolution for each new evolved f
+Paramters: fvals = previous f (as set of 4-tuples (z, w = f(z), f'(z), f''(z))) that was evolved
+Return: vector of arrays of size 4 representing the 4-tuples (z, f(z) = w, f'(z), f''(z)) of the newly evolved f
+*/
+vector< array<double,2> > evolve_stepD(vector< array<double,4> > fvals)
+{
+  vector< array<double,2> > dfVals;
+  int i;
+  vector< array<double,4> > gVals;
+  int firstFlag = 1;
+  double i_g_start;
+  for(i = 0; i < fvals.size(); i++)
+  {
+    double w_next, H, df_ds;//What is being calculated, the next evolved value of f(z), mean curvature H, term for Euler's method, respectively
+    array<double,4> f_cur_element = fvals[i];
+    double z_cur = f_cur_element[0];//current z value
+    double f_cur = f_cur_element[1];//current value of f
+    double fp_cur = f_cur_element[2];//f'(z) at z = z_cur
+    //printf("z: %lf f: %lf f': %lf\n", z_cur, f_cur, fp_cur);
+    double r = 2*LambertW(((z_cur*z_cur) - (f_cur*f_cur)) / exp(1.0)) + 2.0;//Necessary parameters
+    double alpha = 1.0 / sqrt((32.0 / r)*exp(-r/2.0));
+    array<double,2> zw = {z_cur, f_cur};
+    array<double,2> rhotau = KTBTransform2(zw);
+    if(rhotau[0] < BETA)//Scwarzschild Metric
+    {
+
+      H = calcHS(f_cur_element);
+      df_ds = H*alpha*sqrt(1.0 - fp_cur*fp_cur);
+    }
+    else//Glue and Friedman Metric
+    {
+      double fpsqr = fp_cur*fp_cur;//Important parameter
+      if(firstFlag)//First time through
+      {
+        i_g_start = i;//Start of when (rho, g(rho), g'(rho), g''(rho)) needs to be calculated
+        gVals = gGenerator(fvals, i);//First time, calculate values of (rho, g(rho) = tau, g'(rho), g''(rho)
+        //printf("Error does not occur in calculating g\n");
+        firstFlag = 0;//Not first time anymore
+      }
+      array<double,4> gElement = gVals[i - i_g_start];
+      array<double,2> hx = calcHGF2(gElement);//Calcuate H and X
+      H = hx[0];
+      double X = hx[1];
+      char sign;//Sign of abolsute value term, needed to calculate flow parameters
+      double absTerm = (sqrt(2.0) + sqrt(r)) / (sqrt(2) - sqrt(r));
+      if(absTerm >= 0)
+        sign = '+';
+      else
+        sign = '-';
+      array<double,4> param = calcFlowParameters(z_cur, f_cur, sign);//Calculate partial derivative flow parameters
+      if(isnan(param[0]) || isnan(param[1]) || isnan(param[2]) || isnan(param[3]))
+      {
+        printf("Error! nan thrown!\n");
+        printf(" %lf %lf %lf %lf\n", param[0], param[1], param[2], param[3]);
+      }
+      double asqr, b, csqr;
+      asqr = pow(param[3], 2) - X*X*pow(param[1], 2);
+      b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
+      csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
+      df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
+      printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
+      //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
+    }
+    array<double,2> next_element = {z_cur, df_ds};
+    dfVals.push_back(next_element);//Append to vector
+  }
+  return dfVals;
+}
+
+/*Function to perform the evolution
+  Parameters: num_evol = number of evolutions to be performed
+  Return: final evolved f after num_evol evolutions
+*/
+vector< array<double,2> > evolveD(int num_evol)
+{
+  int i = 0;
+  vector< array<double,4> > f0;//Values of (z, f(z) = w, f'(z), f''(z)
+  vector< array<double,2> > dfVals;
+  f0 = fGeneratorPlusPlus(0.0005, 5000);
+  dfVals = evolve_stepD(f0);
+  return dfVals;
+}
+
 int main()
 {
-  int numEvolutions = 3;
-  vector< array<double,4> > f_test = evolve(numEvolutions);
-  outputToFile4(f_test);
+  int numEvolutions = 2;
+  vector< array<double,2> > df_test = evolveD(numEvolutions);
+  outputToFile2B(df_test);
 }
