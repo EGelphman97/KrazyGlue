@@ -14,38 +14,34 @@ double TIME_STEP = 1.0e-04;
 double EP2 = 1.0e-08;
 
 //Function to calculate the first and second derivatives of a function using finite-difference method
-vector< array<double,4> > finiteDiff2(vector< array<double,4> > fvals)
+void finiteDiff2(vector< array<double,4> > fvals)
 {
   int i;
   double h = fvals[1][0] - fvals[0][0];//step size
   int end = fvals.size() - 1;//Last index in vector
-  vector< array<double,4> > newF;
   for(i = 0; i <= end; i++)
   {
-    newF[i][0] = fvals[i][0];
-    newF[i][1] = fvals[i][1];
     if(i >= 2 && i <= end - 2)
     {
-        newF[i][2] = (fvals[i-2][1] - 8.0*fvals[i-1][1] + 8.0*fvals[i+1][1] - fvals[i+2][1]) / (12.0*h);//4th order midpoint for 1st derivative
-        newF[i][3] = (1.0 / (h*h))*(fvals[i-1][1] - 2.0*fvals[i][1] + fvals[i+1][1]);//3rd order midpoint for 2nd derivative
+        fvals[i][2] = (fvals[i-2][1] - 8.0*fvals[i-1][1] + 8.0*fvals[i+1][1] - fvals[i+2][1]) / (12.0*h);//4th order midpoint for 1st derivative
+        fvals[i][3] = (1.0 / (h*h))*(fvals[i-1][1] - 2.0*fvals[i][1] + fvals[i+1][1]);//3rd order midpoint for 2nd derivative
     }
   }
   //Construct linear approximation to second derivative at left endpoint
   double m3l, m3r, bl, br;
-  m3l = (newF[3][3] - newF[2][3]) / h;//slope
-  bl = newF[3][3] - m3l*newF[3][0];//y-intercept
-  newF[1][3] = m3l*newF[1][0] + bl;
-  newF[0][3] = m3l*newF[0][0] + bl;
-  newF[1][2] = 0.5*m3l*pow(newF[1][0],2) + bl*newF[1][0];//Integrate to get the first derivative
-  newF[0][2] = 0.5*m3l*pow(newF[0][0],2) + bl*newF[0][0];
+  m3l = (fvals[3][3] - fvals[2][3]) / h;//slope
+  bl = fvals[3][3] - m3l*fvals[3][0];//y-intercept
+  fvals[1][3] = m3l*fvals[1][0] + bl;
+  fvals[0][3] = m3l*fvals[0][0] + bl;
+  fvals[1][2] = 0.5*m3l*pow(fvals[1][0],2) + bl*fvals[1][0];//Integrate to get the first derivative
+  fvals[0][2] = 0.5*m3l*pow(fvals[0][0],2) + bl*fvals[0][0];
   //Construct linear approximation to second derivative at right endpoint
-  m3r = (newF[end-2][3] - newF[end-3][3]) / h;//slope
-  br = newF[end-2][3] - m3r*newF[end-2][0];//y-intercept
-  newF[end-1][3] = m3r*newF[end-1][0] + br;
-  newF[end][3] = m3r*newF[end][0] + br;
-  newF[end-1][2] = 0.5*m3r*pow(newF[end-1][0],2) + br*newF[end-1][0];//Integrate to get the first derivative
-  newF[end][2] = 0.5*m3r*pow(newF[end][0],2) + br*newF[end][0];
-  return fvals;
+  m3r = (fvals[end-2][3] - fvals[end-3][3]) / h;//slope
+  br = fvals[end-2][3] - m3r*fvals[end-2][0];//y-intercept
+  fvals[end-1][3] = m3r*fvals[end-1][0] + br;
+  fvals[end][3] = m3r*fvals[end][0] + br;
+  fvals[end-1][2] = 0.5*m3r*pow(fvals[end-1][0],2) + br*fvals[end-1][0];//Integrate to get the first derivative
+  fvals[end][2] = 0.5*m3r*pow(fvals[end][0],2) + br*fvals[end][0];
 }
 
 /*Function to calculate the parameters drho/dz, drho/dw, dtau/dz and dtau/dw
@@ -105,9 +101,8 @@ vector< array<double,4> > gGenerator(vector< array<double,4> > f, int idx)
     array<double,4> gElement = {rhotau[0], rhotau[1], 0.0, 0.0};
     g.push_back(gElement);
   }
-  vector< array<double,4> > newG;
-  newG = finiteDiff2(g);//Finite-difference differentiation
-  return newG;
+  finiteDiff2(g);//Finite-difference differentiation
+  return g;
 }
 
 /*Function to calculate the mean curvature H in the Gluing and Friedman region from
@@ -234,15 +229,17 @@ vector< array<double,4> > evolve_step(vector< array<double,4> > fvals)
       asqr = pow(param[3], 2) - X*X*pow(param[1], 2);
       b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
       csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
+      if(i >= fvals.size() - 2)
+        b = -b;
       df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
-      //printf("term: %lf\n", (csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));
+      //printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
       //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
     }
     w_next = f_cur + TIME_STEP*df_ds;//Step for Euler's method
     array<double,4> f_next_element = {z_cur, w_next, 0.0, 0.0};
     f_next.push_back(f_next_element);//Append to vector
   }
-  f_next = finiteDiff2(f_next);//Finite-difference differentiation
+  finiteDiff2(f_next);//Finite-difference differentiation
   return f_next;
 }
 
@@ -328,8 +325,10 @@ vector< array<double,2> > evolve_stepD(vector< array<double,4> > fvals)
       asqr = pow(param[3], 2) - X*X*pow(param[1], 2);
       b = -1.0*param[3]*param[2] + X*X*param[1]*param[0];
       csqr = -1.0*pow(param[2],2) + X*X*pow(param[0],2);
+      if(i >= fvals.size() - 2)
+        b = -b;
       df_ds = H*sqrt((csqr + 2*b*fp_cur - asqr*fpsqr) / (b*b + asqr*csqr));//Calculate df_ds for this metric
-      printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
+      //printf("term1: %lf term2: %lf term3: %lf\n", csqr, 2*b*fp_cur, - asqr*fpsqr);
       //printf("z: %lf f: %lf f': %lf f'': %lf \n", z_cur, f_cur, fp_cur, f_cur_element[3]);
     }
     array<double,2> next_element = {z_cur, df_ds};
@@ -349,12 +348,20 @@ vector< array<double,2> > evolveD(int num_evol)
   vector< array<double,2> > dfVals;
   f0 = fGeneratorPlusPlus(0.0005, 5000);
   dfVals = evolve_stepD(f0);
+  for(i = 0; i < num_evol; i++)
+  {
+    if(i == 0)
+    {
+
+    }
+  }
   return dfVals;
 }
 
 int main()
 {
-  int numEvolutions = 2;
-  vector< array<double,2> > df_test = evolveD(numEvolutions);
-  outputToFile2B(df_test);
+  int numEvolutions = 700;
+  vector< array<double,4> > f_test = evolve(numEvolutions);
+  vector< array<double,2> > hv = calculateH(f_test);
+  outputToFile2(hv);
 }
